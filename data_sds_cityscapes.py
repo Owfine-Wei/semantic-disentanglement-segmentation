@@ -195,16 +195,12 @@ class CSG_CityScapes(Dataset):
         # Changed: Multi-Target Sync Augmentation
         i, j, h, w = transforms.RandomCrop.get_params(origin_image, output_size=self.crop_size)
 
+
         # Apply Crop to all origin tensors
         origin_image = TF.crop(origin_image, i, j, h, w)
         origin_label = TF.crop(origin_label.unsqueeze(0), i, j, h, w).squeeze(0)
 
         image, label, mask = classes_erased_samples_generator(origin_image, origin_label, self.csg_mode)
-
-        # Apply Crop to all csg tensors
-        image = TF.crop(image, i, j, h, w)
-        label = TF.crop(label.unsqueeze(0), i, j, h, w).squeeze(0)
-        mask = TF.crop(mask.unsqueeze(0), i, j, h, w).squeeze(0)
         
         # Apply Flip to all 5 tensors
         if random.random() > 0.5:
@@ -213,7 +209,6 @@ class CSG_CityScapes(Dataset):
             image = TF.hflip(image)
             label = TF.hflip(label)
             mask = TF.hflip(mask)
-
 
         # Final conversion/normalization
         origin_image = self.normalize(origin_image)
