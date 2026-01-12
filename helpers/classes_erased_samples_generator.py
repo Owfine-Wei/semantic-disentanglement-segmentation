@@ -34,15 +34,15 @@ def classes_erased_samples_generator(origin_image, origin_label, mode):
     csg_mask = torch.isin(origin_label, erased_classes)
 
     # Image
-    csg_img = origin_img.copy()
+    csg_img = origin_image.clone()
     csg_img = torch.where(csg_mask, mean_rgb, origin_image)
     
     # Label
-    csg_label = origin_label.copy()
-    csg_label = torch.where(csg_mask, mean_rgb, origin_label)
+    csg_label = origin_label.clone()
+    csg_label = torch.where(csg_mask, 255, origin_label)
     
     # mask
-    csg_mask = torch.isin( origin_label, erased_classes + [255] )
+    csg_mask = torch.isin( origin_label, torch.cat((erased_classes, torch.tensor([255]))) )
     csg_mask = csg_mask.float()
 
     # return Tensor
