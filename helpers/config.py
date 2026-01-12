@@ -124,7 +124,7 @@ TRAINIDS = [
     16,   # train
     17,   # motorcycle
     18,   # bicycle
-    255   # ignore
+    255,  # ignore
 ]
 
 

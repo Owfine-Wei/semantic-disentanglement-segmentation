@@ -187,25 +187,25 @@ class CSG_CityScapes(Dataset):
         origin_image_np = cv2.imread(img_path, cv2.IMREAD_COLOR)
         origin_image_np = cv2.cvtColor(origin_image_np, cv2.COLOR_BGR2RGB)
         origin_label_np = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
-        image_np, label_np, mask_np = classes_erased_samples_generator(img_path, label_path, self.csg_mode)
 
         # Convert to Tensors
         origin_image = torch.from_numpy(origin_image_np).permute(2, 0, 1).float() / 255.0
         origin_label = torch.from_numpy(origin_label_np).long()
-        image = torch.from_numpy(image_np).permute(2, 0, 1).float() / 255.0
-        label = torch.from_numpy(label_np).long()
-        mask = torch.from_numpy(mask_np).float() / 255.0 # Keep as float for transform
 
         # Changed: Multi-Target Sync Augmentation
-        i, j, h, w = transforms.RandomCrop.get_params(image, output_size=self.crop_size)
-        
-        # Apply Crop to all 5 tensors
+        i, j, h, w = transforms.RandomCrop.get_params(origin_image, output_size=self.crop_size)
+
+        # Apply Crop to all origin tensors
         origin_image = TF.crop(origin_image, i, j, h, w)
         origin_label = TF.crop(origin_label.unsqueeze(0), i, j, h, w).squeeze(0)
+
+        image, label, mask = classes_erased_samples_generator(origin_image, origin_label, self.csg_mode)
+
+        # Apply Crop to all csg tensors
         image = TF.crop(image, i, j, h, w)
         label = TF.crop(label.unsqueeze(0), i, j, h, w).squeeze(0)
         mask = TF.crop(mask.unsqueeze(0), i, j, h, w).squeeze(0)
-
+        
         # Apply Flip to all 5 tensors
         if random.random() > 0.5:
             origin_image = TF.hflip(origin_image)
@@ -213,6 +213,7 @@ class CSG_CityScapes(Dataset):
             image = TF.hflip(image)
             label = TF.hflip(label)
             mask = TF.hflip(mask)
+
 
         # Final conversion/normalization
         origin_image = self.normalize(origin_image)

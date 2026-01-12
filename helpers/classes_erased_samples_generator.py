@@ -1,23 +1,18 @@
 import cv2
 import random
-import numpy as np
+import torch
 
 import helpers.config as config
 
-def classes_erased_samples_generator(img_path, label_path, mode):
-
-    # 1. Read image
-    img = cv2.imread(img_path) # BGR
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+def classes_erased_samples_generator(origin_image, origin_label, mode):
 
     # 2. Caculate the RGB mean
-    mean_rgb = np.mean(img, axis=(0, 1))
+    mean_rgb = origin_image.mean(dim=(1,2), keepdim=True)
 
     # 3. Create Mask
     
     # Get classes present in the current image
-    present_classes = np.unique(label)
+    present_classes = torch.unique(origin_label)
 
     # Randomly select classes to erase from present classes
     if mode == 'foreground' :
@@ -33,21 +28,23 @@ def classes_erased_samples_generator(img_path, label_path, mode):
     else:
         erased_classes = []
 
+    erased_classes = torch.tensor(erased_classes).long()
+
     # Create mask where label equals any of the erased_classes
-    csg_mask = np.isin(label, erased_classes)
+    csg_mask = torch.isin(origin_label, erased_classes)
 
     # Image
-    csg_img = img.copy()
-    csg_img[csg_mask] = mean_rgb
+    csg_img = origin_img.copy()
+    csg_img = torch.where(csg_mask, mean_rgb, origin_image)
     
     # Label
-    csg_label = label.copy()
-    csg_label[csg_mask] = 255
+    csg_label = origin_label.copy()
+    csg_label = torch.where(csg_mask, mean_rgb, origin_label)
     
     # mask
-    csg_mask = np.isin( label, erased_classes + [255] )
-    csg_mask = csg_mask.astype(float) * 255.0
+    csg_mask = torch.isin( origin_label, erased_classes + [255] )
+    csg_mask = csg_mask.float()
 
-    # return Numpy.Array
+    # return Tensor
     return csg_img, csg_label, csg_mask
 

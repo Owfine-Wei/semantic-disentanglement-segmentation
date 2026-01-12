@@ -6,6 +6,7 @@ import train
 import itertools
 import fcn_model 
 import helpers.config as config
+from helpers.set_seed import setup_seed
 
 
 if __name__ == '__main__':
@@ -34,11 +35,17 @@ if __name__ == '__main__':
         search_space['batch_size']
     ))
 
+    # seed
+    seed = 42
+    is_enabled = True
+    
     # ==============================================================
 
     local_rank = int(os.environ.get("LOCAL_RANK", -1))
     is_distributed = local_rank != -1
     
+    setup_seed(42,is_enabled=is_enabled)
+
     if is_distributed:
         torch.cuda.set_device(local_rank)
         device = torch.device(f'cuda:{local_rank}')
