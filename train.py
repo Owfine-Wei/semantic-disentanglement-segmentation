@@ -31,13 +31,13 @@ weight_decay = 0.0001
 bn_frozen = False
 
 # Log
-date = "_1_11_2026"
+date = "_1_13_2026"
 info = "_BL+CSG+CL_both_"
 log_root = "/root/autodl-tmp/log/"
 
 # Auxiliary
 aux_is_enabled = True
-aux_weight = 0.4
+aux_weight = 0.2
 
 # Learning rate warmup (steps)
 warmup_is_enabled = True
@@ -62,7 +62,7 @@ else:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if not is_distributed or (dist.is_initialized() and dist.get_rank() == 0):
-    Logger(f"Training on device: {device}")
+    logger(f"Training on device: {device}")
 
 
 def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs):
@@ -114,14 +114,18 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, de
             # Resize outputs to match labels if necessary
             if outputs_img.shape[-2:] != labels.shape[-2:]:
                 outputs_img = F.interpolate(outputs_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
-            if aux_img.shape[-2:] != labels.shape[-2:]:
-                    aux_img = F.interpolate(aux_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
+            if aux_is_enabled:
+                if aux_img.shape[-2:] != labels.shape[-2:]:
+                        aux_img = F.interpolate(aux_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
 
 
             main_integrated_loss = compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_labels, criterion, mode, alpha, beta)
-            aux_integrated_loss = compute_integrated_loss(aux_img, labels, mask, aux_origin, origin_labels, criterion, mode, alpha, beta)
+            if aux_is_enabled:
+                aux_integrated_loss = compute_integrated_loss(aux_img, labels, mask, aux_origin, origin_labels, criterion, mode, alpha, beta)
 
-            integrated_loss = main_integrated_loss + aux_weight * aux_integrated_loss
+                integrated_loss = main_integrated_loss + aux_weight * aux_integrated_loss
+            else:
+                integrated_loss = main_integrated_loss
 
         # Backward pass
         scaler.scale(integrated_loss).backward()
@@ -238,12 +242,25 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
     lr_classifier_end = lr_classifier / 50
     power = 0.9
 
-    def get_lr_lambda(base_lr, lr_end):
-        return lambda step: ((1 - step / total_iters) ** power) * (1 - lr_end / base_lr) + (lr_end / base_lr) if step < total_iters else (lr_end / base_lr)
+    # 1. Backbone Lambda：
+    def backbone_lambda(step):
+        return 1.0
 
+    # 2. Classifier Lambda：
+    # 
+    decay_step = int(total_iters * 0.8) # 
+
+    def classifier_lambda(step):
+        # 
+        if step < decay_step:
+            return 1.0
+        else:
+            return 0.1  #
+
+    # 
     base_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=[
-        get_lr_lambda(lr_backbone, lr_backbone_end),
-        get_lr_lambda(lr_classifier, lr_classifier_end)
+        backbone_lambda,    
+        classifier_lambda 
     ])
 
     # Create scheduler using warmup_iters only.

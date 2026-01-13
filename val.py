@@ -10,7 +10,7 @@ from data_sds_cityscapes import load_data
 
 # ======== Modified by User ========
 model_paths = [
-    '/root/autodl-tmp/models/_1_11_2026_BL+CSG+CL_both__A1.0B0.0_.pth'
+    '/root/autodl-tmp/models/_1_13_2026_BL+CSG+CL_both__A1.0B0.0_.pth'
     ]
 # ==================================
 
