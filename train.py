@@ -11,6 +11,7 @@ from data_sds_cityscapes import load_data
 from helpers.Logger import Logger
 from helpers.integrated_loss import compute_integrated_loss
 from helpers.Aux_loss import AuxModelWrapper
+from helpers.Warmup_scheduler import WarmupScheduler
 
 os.environ['TRANSFORMERS_OFFLINE'] = '1'
 os.environ['HF_DATASETS_OFFLINE'] = '1'
@@ -27,7 +28,7 @@ beta  = 0.0
 momentum = 0.9
 weight_decay = 0.0001
 
-bn_frozen = True
+bn_frozen = False
 
 # Log
 date = "_1_11_2026"
@@ -37,6 +38,11 @@ log_root = "/root/autodl-tmp/log/"
 # Auxiliary
 aux_is_enabled = True
 aux_weight = 0.4
+
+# Learning rate warmup (steps)
+warmup_is_enabled = True
+warmup_iters = 1000
+warmup_factor = 0.01
 
 # ======================================
 
@@ -228,17 +234,20 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
 
     # Learning rate scheduler (Polynomial with lr_end)
     total_iters = int( num_epochs * len(train_iter) )
-    lr_backbone_end = lr_backbone / 100
-    lr_classifier_end = lr_classifier / 100
+    lr_backbone_end = lr_backbone / 50
+    lr_classifier_end = lr_classifier / 50
     power = 0.9
 
     def get_lr_lambda(base_lr, lr_end):
         return lambda step: ((1 - step / total_iters) ** power) * (1 - lr_end / base_lr) + (lr_end / base_lr) if step < total_iters else (lr_end / base_lr)
-    
-    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=[
+
+    base_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=[
         get_lr_lambda(lr_backbone, lr_backbone_end),
         get_lr_lambda(lr_classifier, lr_classifier_end)
     ])
+
+    # Create scheduler using warmup_iters only.
+    scheduler = WarmupScheduler(optimizer, base_scheduler, warmup_iters=warmup_iters, warmup_factor=warmup_factor, is_enabled = warmup_is_enabled)
     
     # Training loop
     train_losses = []

@@ -17,15 +17,42 @@ import os
 
 # ======== Modified by User ========
 
-# Lists to be populated by user before running as a script
-img_path = []
-label_path = []
-semantic = []
+IMG_DIR = "/root/autodl-tmp/data/Cityscapes/leftImg8bit/val"
+LABEL_DIR = "/root/autodl-tmp/data/Cityscapes/gtFine/val"
 
-out_dir = ""
-checkpoint_path = ""
+semantic = 'car'
+
+out_dir = "/root/autodl-tmp/outputs/val_erf"
+
+checkpoint_path = "/root/autodl-tmp/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth"
 
 # ==================================
+
+def get_imgs(img_dir, label_dir):
+	"""
+	Walk `img_dir` and `label_dir` recursively and return two lists:
+	- imgs: sorted list of full image file paths found under `img_dir`
+	- labels: sorted list of full label file paths found under `label_dir`
+
+	This uses `os.walk` to traverse city subdirectories under the provided
+	`.../val/` roots. It supports common image extensions and returns
+	consistently sorted lists so downstream code can rely on ordering.
+	"""
+
+	# helper to collect files with allowed extensions
+	def _collect_files(root_dir):
+		collected = []
+		for droot, _, files in os.walk(root_dir):
+			for fn in files:
+				if fn.lower().endswith(".png"):
+					collected.append(os.path.join(droot, fn))
+		collected.sort()
+		return collected
+
+	imgs = _collect_files(img_dir)
+	labels = _collect_files(label_dir)
+
+	return imgs, labels
 
 
 def img_process(img_path):
@@ -88,7 +115,7 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 	if not isinstance(input_tensor, torch.Tensor):
 		raise TypeError('input_tensor must be a torch.Tensor')
 
-	device = input_tensor.device if input_tensor.is_cuda or input_tensor.device.type == 'cpu' else torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 	device_str = str(device)
 
 	model = fcn_model.get_model(checkpoint=checkpoint_path, device=device_str)
@@ -142,13 +169,17 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 
 	contrib = input_grad.abs().sum(dim=1, keepdim=True)
 
-	# normalize to 0-1 per-sample
+	contrib = torch.log1p(contrib)
 	contrib = contrib.to(torch.float32)
-	min_v = contrib.amin(dim=[1, 2, 3], keepdim=True)
-	max_v = contrib.amax(dim=[1, 2, 3], keepdim=True)
-	range_v = (max_v - min_v)
+	B, C, H, W = contrib.shape
+	tmp = contrib.view(B, -1)
+
+	q_max = torch.quantile(tmp, 0.995, dim=1, keepdim=True).view(B, 1, 1, 1)
+	q_min = contrib.amin(dim=[1, 2, 3], keepdim=True)
+
 	eps = 1e-8
-	contrib = (contrib - min_v) / (range_v + eps)
+	contrib = torch.clamp(contrib, min=q_min, max=q_max)
+	contrib = (contrib - q_min) / (q_max - q_min + eps)
 
 	return contrib
 
@@ -161,18 +192,16 @@ def show_img(img_path, contrib, out_dir):
 	the original image size and used to create multiple outputs.
 	"""
 
+	# get group dir first
+	file_prefix = (os.path.basename(img_path)).replace("_leftImg8bit.png","")
+	group_dir = os.path.join(out_dir, file_prefix)
+	os.makedirs(group_dir, exist_ok=True)
+
 	# 0. read original image (RGB) and save
 	img_bgr = cv2.imread(img_path, cv2.IMREAD_COLOR)
 	if img_bgr is None:
 		raise FileNotFoundError(f"Image not found: {img_path}")
 	img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
-
-	# ensure out_dir exists
-	os.makedirs(out_dir, exist_ok=True)
-	base = os.path.splitext(os.path.basename(img_path))[0]
-	orig_save = os.path.join(out_dir, f"{base}_orig.png")
-	# save RGB but cv2.imwrite expects BGR, so convert back
-	cv2.imwrite(orig_save, cv2.cvtColor(img_rgb, cv2.COLOR_RGB2BGR))
 
 	H, W = img_rgb.shape[:2]
 
@@ -206,17 +235,17 @@ def show_img(img_path, contrib, out_dir):
 	# convert to RGB for blending
 	heatmap_rgb = cv2.cvtColor(heatmap_bgr, cv2.COLOR_BGR2RGB)
 
-	heat_save = os.path.join(out_dir, f"{base}_heatmap.png")
+	heat_save = os.path.join(group_dir, f"{file_prefix}_heatmap.png")
 	cv2.imwrite(heat_save, cv2.cvtColor(heatmap_rgb, cv2.COLOR_RGB2BGR))
 
 	# 2. highlight map: contributions > threshold -> yellow, else light blue
-	threshold = 0.75
+	threshold = 0.1
 	highlight = np.zeros((H, W, 3), dtype=np.uint8)
 	yellow = np.array([255, 255, 0], dtype=np.uint8)
 	blue = np.array([0, 0, 255], dtype=np.uint8)
 	highlight[c > threshold] = yellow
 	highlight[c <= threshold] = blue
-	high_save = os.path.join(out_dir, f"{base}_highlight_mask.png")
+	high_save = os.path.join(group_dir, f"{file_prefix}_highlight_mask.png")
 	cv2.imwrite(high_save, cv2.cvtColor(highlight, cv2.COLOR_RGB2BGR))
 
 	# 3. overlay heatmap on original (faded)
@@ -224,14 +253,14 @@ def show_img(img_path, contrib, out_dir):
 	orig_f = img_rgb.astype(np.float32)
 	heat_f = heatmap_rgb.astype(np.float32)
 	over_heat = (orig_f * (1 - alpha) + heat_f * alpha).astype(np.uint8)
-	over_heat_save = os.path.join(out_dir, f"{base}_heatmap_overlay.png")
+	over_heat_save = os.path.join(group_dir, f"{file_prefix}_heatmap_overlay.png")
 	cv2.imwrite(over_heat_save, cv2.cvtColor(over_heat, cv2.COLOR_RGB2BGR))
 
 	# 4. overlay highlight on original
 	alpha2 = 0.5
 	high_f = highlight.astype(np.float32)
 	over_high = (orig_f * (1 - alpha2) + high_f * alpha2).astype(np.uint8)
-	over_high_save = os.path.join(out_dir, f"{base}_highlight_overlay.png")
+	over_high_save = os.path.join(group_dir, f"{file_prefix}_highlight_overlay.png")
 	cv2.imwrite(over_high_save, cv2.cvtColor(over_high, cv2.COLOR_RGB2BGR))
 
 	# done
@@ -262,9 +291,11 @@ def show_erf(checkpoint_path, img_path, label_path, semantic, out_dir):
 
 if __name__ == "__main__":
 
-	if not (len(img_path) == len(label_path) == len(semantic)):
-		print('Error: img_path, label_path and semantic must have the same length')
-	else:
-		for ip, lp, sm in zip(img_path, label_path, semantic):
-			show_erf(checkpoint_path, ip, lp, sm, out_dir)
+	imgs, labels = get_imgs(IMG_DIR, LABEL_DIR)
 
+	if len(imgs) != len(labels):
+		raise ValueError(f"Number of images ({len(imgs)}) does not match number of labels ({len(labels)}).\n"
+						 f"Check IMG_DIR={IMG_DIR} and LABEL_DIR={LABEL_DIR} and their city subfolders.")
+
+	for img_p, lbl_p in zip(imgs, labels):
+		show_erf(checkpoint_path, img_p, lbl_p, semantic, out_dir)
