@@ -1,3 +1,11 @@
+"""
+Utilities to visualize input-gradient contributions (ERF) for segmentation.
+
+This module loads a trained model, computes input gradients for a
+selected semantic class mask, normalizes the contribution map, and writes
+several visualization images (heatmap, highlight mask, overlays).
+"""
+
 import torch
 import torch.nn.functional as F
 import helpers.config as config
@@ -9,6 +17,7 @@ import os
 
 # ======== Modified by User ========
 
+# Lists to be populated by user before running as a script
 img_path = []
 label_path = []
 semantic = []
@@ -19,8 +28,12 @@ checkpoint_path = ""
 # ==================================
 
 
-
 def img_process(img_path):
+	"""
+	Read image, normalize by config mean/std and return CHW tensor.
+
+	Returns a float32 tensor shaped (1, C, H, W).
+	"""
 
 	img_bgr = cv2.imread(img_path, cv2.IMREAD_COLOR)
 	if img_bgr is None:
@@ -39,8 +52,13 @@ def img_process(img_path):
 	return img_tensor
 
 
-
 def get_grad_mask(label_path, semantic):
+	"""
+	Load label image and return a binary mask tensor for `semantic`.
+
+	The mask has shape (1,1,H,W) and dtype long, marking pixels equal to
+	the trainId of the requested semantic class.
+	"""
 
 	label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
 	if label is None:
@@ -57,8 +75,15 @@ def get_grad_mask(label_path, semantic):
 	return mask_tensor
 
 
-
 def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
+	"""
+	Compute normalized input-gradient contribution map for `grad_mask`.
+
+	If `grad_mask` is None the function returns raw logits. When provided,
+	the mask is expanded to match logits channels and used as `grad_outputs`
+	in `torch.autograd.grad` to compute per-pixel input gradients.
+	Returns a normalized contribution map in [0,1] with shape (1,1,H,W).
+	"""
 
 	if not isinstance(input_tensor, torch.Tensor):
 		raise TypeError('input_tensor must be a torch.Tensor')
@@ -75,6 +100,7 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 
 	out = model(input_var)
 
+	# handle models returning tuple/list or dict
 	if isinstance(out, (tuple, list)):
 		logits = out[0]
 	elif isinstance(out, dict) and 'logits' in out:
@@ -89,11 +115,11 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 	if (h, w) != config.IMG_SIZE:
 		logits = F.interpolate(logits, size=config.IMG_SIZE, mode='bilinear', align_corners=False)
 
-	# 如果没有 grad_mask，只返回 logits
+	# if no grad mask requested, return logits directly
 	if grad_mask is None:
 		return logits
 
-	# 处理 grad_mask -> (B,1,H,W) 或 (B,C,H,W)
+	# normalize and reshape grad_mask to (B,1,H,W) or (B,C,H,W)
 	if not torch.is_tensor(grad_mask):
 		grad_mask = torch.from_numpy(np.array(grad_mask))
 	grad_mask = grad_mask.to(device=logits.device)
@@ -102,13 +128,13 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 	if grad_mask.dim() != 4:
 		raise ValueError('grad_mask must be shape (B,1,H,W) or (B,H,W)')
 
-	# 扩展到 logits 通道数
+	# expand mask to logits channel dimension when needed
 	if grad_mask.size(1) == 1 and logits.size(1) != 1:
 		grad_for_logits = grad_mask.expand(-1, logits.size(1), -1, -1).to(dtype=logits.dtype)
 	else:
 		grad_for_logits = grad_mask.to(dtype=logits.dtype)
 
-	# 使用 autograd.grad 计算输入梯度，更稳健且无需全局搜索
+	# compute input gradients w.r.t. logits using autograd.grad
 	input_grad = torch.autograd.grad(outputs=logits, inputs=input_var, grad_outputs=grad_for_logits, retain_graph=True, allow_unused=True)[0]
 
 	if input_grad is None:
@@ -116,10 +142,10 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 
 	contrib = input_grad.abs().sum(dim=1, keepdim=True)
 
-	# 归一化到 0-1
+	# normalize to 0-1 per-sample
 	contrib = contrib.to(torch.float32)
-	min_v = contrib.amin(dim=[1,2,3], keepdim=True)
-	max_v = contrib.amax(dim=[1,2,3], keepdim=True)
+	min_v = contrib.amin(dim=[1, 2, 3], keepdim=True)
+	max_v = contrib.amax(dim=[1, 2, 3], keepdim=True)
 	range_v = (max_v - min_v)
 	eps = 1e-8
 	contrib = (contrib - min_v) / (range_v + eps)
@@ -127,10 +153,15 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 	return contrib
 
 
-
 def show_img(img_path, contrib, out_dir):
+	"""
+	Save visualization images: original, heatmap, highlight mask and overlays.
 
-	# 0. 读取原图并保存（RGB）
+	`contrib` may be a tensor or numpy array; it will be resized/clipped to
+	the original image size and used to create multiple outputs.
+	"""
+
+	# 0. read original image (RGB) and save
 	img_bgr = cv2.imread(img_path, cv2.IMREAD_COLOR)
 	if img_bgr is None:
 		raise FileNotFoundError(f"Image not found: {img_path}")
@@ -153,7 +184,7 @@ def show_img(img_path, contrib, out_dir):
 
 	# support shapes: (1,1,H,W), (1,H,W), (H,W)
 	if c.ndim == 4:
-		c = c[0,0]
+		c = c[0, 0]
 	elif c.ndim == 3:
 		# could be (1,H,W)
 		if c.shape[0] == 1:
@@ -169,28 +200,26 @@ def show_img(img_path, contrib, out_dir):
 	# clip and ensure float in [0,1]
 	c = np.clip(c, 0.0, 1.0)
 
-	# 1. 生成热力图 (淡一点颜色)
+	# 1. generate heatmap (soft color)
 	heat_uint8 = (c * 255).astype(np.uint8)
 	heatmap_bgr = cv2.applyColorMap(heat_uint8, cv2.COLORMAP_JET)
-	# make heatmap a bit faded by converting to float and scaling
+	# convert to RGB for blending
 	heatmap_rgb = cv2.cvtColor(heatmap_bgr, cv2.COLOR_BGR2RGB)
 
 	heat_save = os.path.join(out_dir, f"{base}_heatmap.png")
 	cv2.imwrite(heat_save, cv2.cvtColor(heatmap_rgb, cv2.COLOR_RGB2BGR))
 
-	# 2. 生成高亮图：贡献>0.75 为黄色，其余为淡蓝
+	# 2. highlight map: contributions > threshold -> yellow, else light blue
 	threshold = 0.75
 	highlight = np.zeros((H, W, 3), dtype=np.uint8)
-	# yellow RGB
 	yellow = np.array([255, 255, 0], dtype=np.uint8)
-	# light blue RGB
-	light_blue = np.array([173, 216, 230], dtype=np.uint8)
+	blue = np.array([0, 0, 255], dtype=np.uint8)
 	highlight[c > threshold] = yellow
-	highlight[c <= threshold] = light_blue
+	highlight[c <= threshold] = blue
 	high_save = os.path.join(out_dir, f"{base}_highlight_mask.png")
 	cv2.imwrite(high_save, cv2.cvtColor(highlight, cv2.COLOR_RGB2BGR))
 
-	# 3. overlap heatmap and original (heatmap淡一点)
+	# 3. overlay heatmap on original (faded)
 	alpha = 0.45
 	orig_f = img_rgb.astype(np.float32)
 	heat_f = heatmap_rgb.astype(np.float32)
@@ -198,19 +227,23 @@ def show_img(img_path, contrib, out_dir):
 	over_heat_save = os.path.join(out_dir, f"{base}_heatmap_overlay.png")
 	cv2.imwrite(over_heat_save, cv2.cvtColor(over_heat, cv2.COLOR_RGB2BGR))
 
-	# 4. overlap highlight and original
+	# 4. overlay highlight on original
 	alpha2 = 0.5
 	high_f = highlight.astype(np.float32)
 	over_high = (orig_f * (1 - alpha2) + high_f * alpha2).astype(np.uint8)
 	over_high_save = os.path.join(out_dir, f"{base}_highlight_overlay.png")
 	cv2.imwrite(over_high_save, cv2.cvtColor(over_high, cv2.COLOR_RGB2BGR))
 
-	# 5. done (no return)
+	# done
 	return
 
 
-
 def show_erf(checkpoint_path, img_path, label_path, semantic, out_dir):
+	"""
+	High-level helper: compute contribution map and save visualizations.
+
+	Steps: preprocess image -> build grad mask -> compute contrib -> save images.
+	"""
 
 	# 1. preprocess image
 	img_tensor = img_process(img_path)
@@ -225,7 +258,6 @@ def show_erf(checkpoint_path, img_path, label_path, semantic, out_dir):
 	show_img(img_path, contrib, out_dir)
 
 	return
-
 
 
 if __name__ == "__main__":

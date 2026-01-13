@@ -1,3 +1,11 @@
+"""
+Model initialization helper for FCN-ResNet50-D8 using MMSegmentation.
+
+Provides `get_model(num_classes, checkpoint, device)` which builds an FCN
+model from an mmseg config, updates class counts, and optionally loads a
+checkpoint onto the requested device.
+"""
+
 import os
 import torch
 from mmseg.apis import init_model
@@ -39,7 +47,7 @@ def get_model(num_classes=19, checkpoint=None, device='cuda:0'):
     model = init_model(cfg, checkpoint=None, device=device)
 
     if checkpoint is not None and os.path.exists(checkpoint):
-        print(f"Loading checkpoint from {checkpoint}...")
+        # print(f"Loading checkpoint from {checkpoint}...")
         checkpoint_data = torch.load(checkpoint, map_location=device)
 
         # Handle if checkpoint is a dictionary with 'state_dict' or just the state_dict
@@ -50,7 +58,7 @@ def get_model(num_classes=19, checkpoint=None, device='cuda:0'):
 
         # Load weights
         model.load_state_dict(state_dict, strict=False)
-        print("Checkpoint loaded successfully.")
+        # print("Checkpoint loaded successfully.")
     
     return model
 

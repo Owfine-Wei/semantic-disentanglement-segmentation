@@ -1,3 +1,11 @@
+"""
+SegFormer model initialization helper using MMSegmentation configs.
+
+Provides `get_model(num_classes, checkpoint, device)` which builds a
+SegFormer (MiT-B3) model from an mmseg config, updates the decode head
+class count, and optionally loads weights from a checkpoint.
+"""
+
 import os
 import torch
 from mmseg.apis import init_model
@@ -39,7 +47,7 @@ def get_model(num_classes=19, checkpoint=None, device='cuda:0'):
 
     # 4. Manually load weights and handle DDP prefix ('module.')
     if checkpoint is not None and os.path.exists(checkpoint):
-        print(f"Loading checkpoint from {checkpoint}...")
+        # print(f"Loading checkpoint from {checkpoint}...")
         checkpoint_data = torch.load(checkpoint, map_location=device)
 
         # Extract the state_dict
@@ -51,7 +59,7 @@ def get_model(num_classes=19, checkpoint=None, device='cuda:0'):
         # Load weights into the model
         # strict=False allows skipping mismatched layers (e.g., different class numbers in the head)
         load_info = model.load_state_dict(state_dict, strict=False)
-        print(f"Checkpoint loaded successfully. Load info: {load_info}")
+        # print(f"Checkpoint loaded successfully. Load info: {load_info}")
     
     return model
 

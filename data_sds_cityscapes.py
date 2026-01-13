@@ -1,3 +1,11 @@
+"""
+Dataset utilities for SDS training on Cityscapes.
+
+Defines dataset wrappers for original, foreground-only, background-only,
+and class-erased samples (CSG). Exposes `load_data` and a custom
+`collate_fn` suitable for optional None fields in dataset items.
+"""
+
 import os
 import cv2
 import torch
@@ -12,27 +20,29 @@ import helpers.config as config
 from helpers.classes_erased_samples_generator import classes_erased_samples_generator
 
 class Origin_CityScapes(Dataset):
+    """
+    Dataset for original Cityscapes images and trainIds labels.
+
+    Returns tuples of (image_tensor, label_tensor, None, None, None) so it
+    can be used interchangeably with other dataset wrappers in this file.
+    """
+
     def __init__(self, root, split):
         # Basic Configs
         self.root = root   # DATA_DIR
         self.split = split # train / val / test
-        
+
         # Img / Label Directory
         self.img_dir = config.DIRS['origin']['imgs'] + self.split
         self.label_dir = config.DIRS['origin']['labels'] + self.split
 
-        # Changed: Store crop size and normalization separately for functional use
+        # Store crop size and normalization for transforms
         self.crop_size = (config.CROP_SIZE['h'], config.CROP_SIZE['w'])
-        self.normalize = transforms.Normalize(
-            mean=config.RGB_MEAN, 
-            std=config.RGB_STD
-        )
+        self.normalize = transforms.Normalize(mean=config.RGB_MEAN, std=config.RGB_STD)
 
-        # Datasets
         self.images = []
         self.labels = []
 
-        # Check on directories
         if not os.path.exists(self.img_dir) or not os.path.exists(self.label_dir):
             raise FileNotFoundError(f"Directory not found: {self.img_dir} or {self.label_dir}")
 
@@ -47,7 +57,7 @@ class Origin_CityScapes(Dataset):
             for file in files:
                 if file.endswith(label_suffix):
                     self.labels.append(os.path.join(root_path, file))
-        self.labels.sort()      
+        self.labels.sort()
 
         if len(self.images) == 0:
             print(f"Warning: No images found in {self.img_dir}")
@@ -63,41 +73,40 @@ class Origin_CityScapes(Dataset):
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
 
-        # Changed: Removed tv_tensors, use standard torch.from_numpy
+        # to tensor CxHxW, normalized to [0,1]
         image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
         label = torch.from_numpy(label).long()
 
         if self.split == 'train':
-
-            # 1. Synchronized Random Crop
+            # synchronized random crop and horizontal flip for image+label
             i, j, h, w = transforms.RandomCrop.get_params(image, output_size=self.crop_size)
             image = TF.crop(image, i, j, h, w)
-            # Unsqueeze label to (1, H, W) for spatial transform, then squeeze back
             label = TF.crop(label.unsqueeze(0), i, j, h, w).squeeze(0)
-
-            # 2. Synchronized Random Horizontal Flip
             if random.random() > 0.5:
                 image = TF.hflip(image)
                 label = TF.hflip(label)
 
-        # Normalization
         image = self.normalize(image)
         return image, label, None, None, None
         
 class FOREBACK_CityScapes(Dataset):
+    """
+    Dataset for foreground-only or background-only images.
+
+    The `mode` argument selects which split ('foreground'|'background') to
+    load. Returns same item format as other datasets.
+    """
+
     def __init__(self, root, mode, split):
-        self.root = root   
-        self.split = split 
+        self.root = root
+        self.split = split
         self.mode = mode   # foreground / background
-        
+
         self.img_dir = config.DIRS[mode]['imgs'] + self.split
         self.label_dir = config.DIRS[mode]['labels'] + self.split
 
         self.crop_size = (config.CROP_SIZE['h'], config.CROP_SIZE['w'])
-        self.normalize = transforms.Normalize(
-            mean=config.RGB_MEAN, 
-            std=config.RGB_STD
-        )
+        self.normalize = transforms.Normalize(mean=config.RGB_MEAN, std=config.RGB_STD)
 
         self.images = []
         self.labels = []
@@ -116,7 +125,7 @@ class FOREBACK_CityScapes(Dataset):
             for file in files:
                 if file.endswith(label_suffix):
                     self.labels.append(os.path.join(root_path, file))
-        self.labels.sort()      
+        self.labels.sort()
 
     def __len__(self):
         return len(self.images)
@@ -133,7 +142,7 @@ class FOREBACK_CityScapes(Dataset):
         label = torch.from_numpy(label).long()
 
         if self.split == 'train':
-            # Changed: Sync Augmentation
+            # sync random crop + flip
             i, j, h, w = transforms.RandomCrop.get_params(image, output_size=self.crop_size)
             image = TF.crop(image, i, j, h, w)
             label = TF.crop(label.unsqueeze(0), i, j, h, w).squeeze(0)
@@ -146,20 +155,24 @@ class FOREBACK_CityScapes(Dataset):
         
 
 class CSG_CityScapes(Dataset):
+    """
+    Dataset generating class-erased (CSG) samples, optionally with origin.
+
+    If `mode=='with_origin'`, items are (image, label, mask, origin_image, origin_label).
+    If `mode=='csg_only'`, items are (image, label, None, None, None).
+    """
+
     def __init__(self, root, mode, split, csg_mode):
-        self.root = root   
-        self.split = split 
+        self.root = root
+        self.split = split
         self.mode = mode   # 'csg_only' or 'with_origin'
-        self.csg_mode = csg_mode 
-        
+        self.csg_mode = csg_mode
+
         self.img_dir = config.DIRS['csg']['imgs'] + self.split
         self.label_dir = config.DIRS['csg']['labels'] + self.split
 
         self.crop_size = (config.CROP_SIZE['h'], config.CROP_SIZE['w'])
-        self.normalize = transforms.Normalize(
-            mean=config.RGB_MEAN, 
-            std=config.RGB_STD
-        )
+        self.normalize = transforms.Normalize(mean=config.RGB_MEAN, std=config.RGB_STD)
 
         self.images = []
         self.labels = []
@@ -175,7 +188,7 @@ class CSG_CityScapes(Dataset):
             for file in files:
                 if file.endswith(label_suffix):
                     self.labels.append(os.path.join(root_path, file))
-        self.labels.sort()      
+        self.labels.sort()
 
     def __len__(self):
         return len(self.images)
@@ -183,26 +196,24 @@ class CSG_CityScapes(Dataset):
     def __getitem__(self, idx):
         img_path = self.images[idx]
         label_path = self.labels[idx]
-            
+
         origin_image_np = cv2.imread(img_path, cv2.IMREAD_COLOR)
         origin_image_np = cv2.cvtColor(origin_image_np, cv2.COLOR_BGR2RGB)
         origin_label_np = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
 
-        # Convert to Tensors
+        # to tensors
         origin_image = torch.from_numpy(origin_image_np).permute(2, 0, 1).float() / 255.0
         origin_label = torch.from_numpy(origin_label_np).long()
 
-        # Changed: Multi-Target Sync Augmentation
+        # synchronized crop for origin and derived samples
         i, j, h, w = transforms.RandomCrop.get_params(origin_image, output_size=self.crop_size)
-
-
-        # Apply Crop to all origin tensors
         origin_image = TF.crop(origin_image, i, j, h, w)
         origin_label = TF.crop(origin_label.unsqueeze(0), i, j, h, w).squeeze(0)
 
+        # generate class-erased sample (image,label,mask)
         image, label, mask = classes_erased_samples_generator(origin_image, origin_label, self.csg_mode)
-        
-        # Apply Flip to all 5 tensors
+
+        # synchronized horizontal flip
         if random.random() > 0.5:
             origin_image = TF.hflip(origin_image)
             origin_label = TF.hflip(origin_label)
@@ -210,7 +221,6 @@ class CSG_CityScapes(Dataset):
             label = TF.hflip(label)
             mask = TF.hflip(mask)
 
-        # Final conversion/normalization
         origin_image = self.normalize(origin_image)
         image = self.normalize(image)
         mask = mask.long()
@@ -222,6 +232,8 @@ class CSG_CityScapes(Dataset):
 
 
 class NDA_CityScapes(Dataset):
+    """Concatenate Origin, Foreground and Background datasets in one view."""
+
     def __init__(self, root, split):
         self.origin_dataset = Origin_CityScapes(root, split)
         self.foreground_dataset = FOREBACK_CityScapes(root, 'foreground', split)
@@ -242,6 +254,8 @@ class NDA_CityScapes(Dataset):
             return self.background_dataset[idx - self.len_origin - self.len_fore]
 
 class SDS_CityScapes(Dataset):
+    """Factory wrapper returning one of the dataset views by `mode`."""
+
     def __init__(self, root, mode, split, csg_mode=None):
         self.mode = mode
         if mode == 'origin':
@@ -253,11 +267,11 @@ class SDS_CityScapes(Dataset):
         elif mode == 'csg+origin':
             self.dataset = CSG_CityScapes(root, 'with_origin', split, csg_mode)
         elif mode == 'csg_only':
-             self.dataset = CSG_CityScapes(root, 'csg_only', split, csg_mode)
+            self.dataset = CSG_CityScapes(root, 'csg_only', split, csg_mode)
         elif mode == 'nda':
-             self.dataset = NDA_CityScapes(root, split)
+            self.dataset = NDA_CityScapes(root, split)
         else:
-             raise ValueError(f"Unknown mode: {mode}")
+            raise ValueError(f"Unknown mode: {mode}")
 
     def __len__(self):
         return len(self.dataset)
@@ -266,6 +280,14 @@ class SDS_CityScapes(Dataset):
         return self.dataset[idx]
 
 def collate_fn(batch):
+    """
+    Custom collate that handles None fields in dataset items.
+
+    The dataset items are tuples like (img, label, mask, origin_img, origin_label)
+    where some entries may be None. This function applies default_collate to
+    each column if the first element is not None, otherwise returns None.
+    """
+
     transposed = list(zip(*batch))
     return [
         default_collate(samples) if samples[0] is not None else None
@@ -273,18 +295,31 @@ def collate_fn(batch):
     ]
 
 def load_data(root, mode, split, csg_mode=None, batch_size=1, num_workers=4, distributed=False):
+    """
+    Create DataLoader for selected dataset `mode`.
+
+    Supports distributed sampling when `distributed=True`.
+    """
+
     dataset = SDS_CityScapes(root, mode, split, csg_mode)
     sampler = DistributedSampler(dataset) if distributed else None
     shuffle = True if not distributed else False
-    dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, 
-                            num_workers=num_workers, persistent_workers=True, 
-                            sampler=sampler, collate_fn=collate_fn, 
-                            pin_memory=True if split == 'train' else False)
+    dataloader = DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=num_workers,
+        persistent_workers=True,
+        sampler=sampler,
+        collate_fn=collate_fn,
+        pin_memory=True if split == 'train' else False,
+    )
     return dataloader
 
 def check_data_shapes(root, mode, split, csg_mode=None):
+    """Small helper to instantiate loader and print one batch for sanity check."""
+
     dataloader = load_data(root, mode, split, csg_mode)
-    # Testing logic...
     for data in dataloader:
         print(f"Sample Batch Received. Mode: {mode}")
         break

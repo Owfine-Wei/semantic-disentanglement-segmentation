@@ -1,3 +1,8 @@
+"""
+Comprehensive seed locking for Hybrid MMSegmentation/PyTorch projects.
+
+"""
+
 import os
 import random
 import numpy as np
@@ -5,9 +10,7 @@ import torch
 from mmengine.runner import set_random_seed
 
 def setup_seed(seed=42, deterministic=True, is_enabled = True):
-    """
-    Comprehensive seed locking for Hybrid MMSegmentation/PyTorch projects.
-    """
+
     if is_enabled:
         # 1. MMEngine high-level seed setting
         # This handles DataLoader workers, distributed rank offsets, 

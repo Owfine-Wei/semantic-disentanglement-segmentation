@@ -9,7 +9,7 @@ import gc
 import helpers.config as config
 from data_sds_cityscapes import load_data
 from helpers.Logger import Logger
-from python.helpers.integrated_loss import compute_integrated_loss
+from helpers.integrated_loss import compute_integrated_loss
 from helpers.Aux_loss import AuxModelWrapper
 
 os.environ['TRANSFORMERS_OFFLINE'] = '1'
@@ -56,10 +56,7 @@ else:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 if not is_distributed or (dist.is_initialized() and dist.get_rank() == 0):
-    print(f"Training on device: {device}")
-
-
-
+    Logger(f"Training on device: {device}")
 
 
 def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs):

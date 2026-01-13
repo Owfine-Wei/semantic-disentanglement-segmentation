@@ -1,6 +1,9 @@
-# ==============================================================================
-# CONFIG: Paths, data stats, model, classes, and training
-# ==============================================================================
+
+"""
+Project configuration: dataset paths, preprocessing values,
+class definitions, and visualization settings used across training and
+evaluation of the semantic segmentation project.
+"""
 
 # ==============================================================================
 # DIRECTORIES
