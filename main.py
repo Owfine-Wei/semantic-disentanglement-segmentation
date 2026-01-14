@@ -32,15 +32,13 @@ if __name__ == '__main__':
         'lr_backbone': [1e-6],  
         'lr_classifier': [1e-5], 
         'batch_size': [2],  # effective_batch_size = batch_size * num_gpus
-        'alpha' : [0.5, 0.75, 1]
     }
 
     # Grid search config
     grid_search_configs = list(itertools.product(
         search_space['lr_backbone'],
         search_space['lr_classifier'],
-        search_space['batch_size'],
-        search_space['alpha']
+        search_space['batch_size']
     ))
 
     # ==============================================================
@@ -57,13 +55,13 @@ if __name__ == '__main__':
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Main loop
-    for (i, (lr_backbone, lr_classifier,batch_size,alpha)) in enumerate(grid_search_configs, start=1) :
+    for (i, (lr_backbone, lr_classifier,batch_size)) in enumerate(grid_search_configs, start=1) :
 
         # Create model
         # Disabling pretrained weights to avoid network issues properly
         model = models.get_model(num_classes=config.NUM_CLASSES, checkpoint = model_checkpoint_path,model_type=model_type).to(device) # modify to match your model
 
-        train.train(model,device,num_epochs,batch_size,lr_backbone,lr_classifier,alpha,from_scratch,model_checkpoint_path)
+        train.train(model,device,num_epochs,batch_size,lr_backbone,lr_classifier,from_scratch,model_checkpoint_path)
 
         del model 
         gc.collect() 

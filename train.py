@@ -22,7 +22,7 @@ os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
 mode = 'csg+origin' # origin / foreground / background / csg_only / csg+origin / nda
 csg_mode = 'both'  # foreground / background / both
 
-# alpha = 0.5
+alpha = 1.0
 beta  = 0.0
 
 momentum = 0.9
@@ -65,7 +65,7 @@ if not is_distributed or (dist.is_initialized() and dist.get_rank() == 0):
     logger(f"Training on device: {device}")
 
 
-def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs,alpha):
+def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs):
 
     model.train()
 
@@ -166,7 +166,7 @@ def validate_epoch(model, val_loader, criterion, device):
     
     return val_loss / num_batches
 
-def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, alpha, from_scratch = True, model_checkpoint_path = None):
+def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, from_scratch = True, model_checkpoint_path = None):
 
     if not is_distributed or dist.get_rank() == 0:
         logger(f"lr_backbone:{lr_backbone}, lr_classifier:{lr_classifier}, epochs:{num_epochs}, alpha:{alpha}, beta:{beta}\n")
@@ -260,7 +260,7 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, alp
         for epoch in range(num_epochs):
 
             # Train one epoch
-            train_loss = train_epoch(model, train_iter, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs, alpha)
+            train_loss = train_epoch(model, train_iter, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs)
             train_losses.append(train_loss)
             
             gc.collect()
