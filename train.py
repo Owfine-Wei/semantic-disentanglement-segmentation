@@ -22,7 +22,7 @@ os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
 mode = 'csg+origin' # origin / foreground / background / csg_only / csg+origin / nda
 csg_mode = 'both'  # foreground / background / both
 
-alpha = 1.0
+# alpha = 0.5
 beta  = 0.0
 
 momentum = 0.9
@@ -31,12 +31,12 @@ weight_decay = 0.0001
 bn_frozen = False
 
 # Log
-date = "_1_13_2026"
-info = "_BL+CSG+CL_both_"
+date = "_1_14_2026"
+info = "_BL+CSG+CL_both_CE_"
 log_root = "/root/autodl-tmp/log/"
 
 # Auxiliary
-aux_is_enabled = True
+aux_is_enabled = False
 aux_weight = 0.2
 
 # Learning rate warmup (steps)
@@ -65,7 +65,7 @@ if not is_distributed or (dist.is_initialized() and dist.get_rank() == 0):
     logger(f"Training on device: {device}")
 
 
-def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs):
+def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs,alpha):
 
     model.train()
 
@@ -166,7 +166,7 @@ def validate_epoch(model, val_loader, criterion, device):
     
     return val_loss / num_batches
 
-def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, from_scratch = True, model_checkpoint_path = None):
+def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, alpha, from_scratch = True, model_checkpoint_path = None):
 
     if not is_distributed or dist.get_rank() == 0:
         logger(f"lr_backbone:{lr_backbone}, lr_classifier:{lr_classifier}, epochs:{num_epochs}, alpha:{alpha}, beta:{beta}\n")
@@ -238,29 +238,15 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
 
     # Learning rate scheduler (Polynomial with lr_end)
     total_iters = int( num_epochs * len(train_iter) )
-    lr_backbone_end = lr_backbone / 50
-    lr_classifier_end = lr_classifier / 50
+    min_lr_ratio = 1.0 / 50.0 
     power = 0.9
 
-    # 1. Backbone Lambda：
-    def backbone_lambda(step):
-        return 1.0
+    def lr_lambda(step):
+        coeff = (1 - step / total_iters) ** power
+        return coeff * (1 - min_lr_ratio) + min_lr_ratio
 
-    # 2. Classifier Lambda：
-    # 
-    decay_step = int(total_iters * 0.8) # 
-
-    def classifier_lambda(step):
-        # 
-        if step < decay_step:
-            return 1.0
-        else:
-            return 0.1  #
-
-    # 
     base_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=[
-        backbone_lambda,    
-        classifier_lambda 
+        lr_lambda, lr_lambda
     ])
 
     # Create scheduler using warmup_iters only.
@@ -274,7 +260,7 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
         for epoch in range(num_epochs):
 
             # Train one epoch
-            train_loss = train_epoch(model, train_iter, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs)
+            train_loss = train_epoch(model, train_iter, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs, alpha)
             train_losses.append(train_loss)
             
             gc.collect()

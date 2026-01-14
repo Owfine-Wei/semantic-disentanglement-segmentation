@@ -41,6 +41,8 @@ def get_model(num_classes=19, checkpoint=None, device='cuda:0'):
     if hasattr(cfg.model, 'auxiliary_head') and cfg.model.auxiliary_head is not None:
         cfg.model.auxiliary_head.num_classes = num_classes
 
+    cfg.model.auxiliary_head = None
+
     # 3. Build the model and load weights
     # If checkpoint is provided, init_model will automatically call load_checkpoint
     # MODIFIED: Load checkpoint manually to handle plain state_dict and DDP prefix
