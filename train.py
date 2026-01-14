@@ -20,7 +20,7 @@ os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
 # ========== Modified by User ==========
 
 mode = 'csg+origin' # origin / foreground / background / csg_only / csg+origin / nda
-csg_mode = 'both'  # foreground / background / both
+csg_mode = 'foreground'  # foreground / background / both
 
 alpha = 1.0
 beta  = 0.0
@@ -32,7 +32,7 @@ bn_frozen = False
 
 # Log
 date = "_1_14_2026"
-info = "_BL+CSG+CL_both_CE_"
+info = "_BL+CSG+CL_fore_CE_"
 log_root = "/root/autodl-tmp/log/"
 
 # Auxiliary

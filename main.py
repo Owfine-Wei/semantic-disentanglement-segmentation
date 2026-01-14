@@ -25,12 +25,12 @@ if __name__ == '__main__':
     model_checkpoint_path = '/root/autodl-tmp/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth'
 
     # Basic Configs
-    num_epochs = 15
+    num_epochs = 20
 
     # Search space
     search_space = {
-        'lr_backbone': [1e-6],  
-        'lr_classifier': [1e-5], 
+        'lr_backbone': [1e-5],  
+        'lr_classifier': [1e-4], 
         'batch_size': [2],  # effective_batch_size = batch_size * num_gpus
     }
 
