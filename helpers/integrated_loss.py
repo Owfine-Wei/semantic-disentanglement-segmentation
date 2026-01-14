@@ -48,19 +48,24 @@ def compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_la
             mask = F.interpolate(mask.float().unsqueeze(1), size=outputs_img.shape[-2:], mode='nearest').squeeze(1).long()
 
         # add channel dim for broadcasting
-        mask = mask.unsqueeze(1)
+        mask = mask.unsqueeze(1) # B 1 H W
 
         # freeze the gradient propagation from origin outputs
-        outputs_origin_frozen = outputs_origin.detach()
+        outputs_origin_frozen = outputs_origin.detach() # B num_classes H W
 
         # difference only on non-masked (valid) pixels
-        diff = (outputs_img - outputs_origin_frozen) * (1.0 - mask)
+        diff = (outputs_img - outputs_origin_frozen) * (1.0 - mask) # B num_classes H W
+        diff_square = torch.sum(diff**2, dim=(1,2,3), keepdim = True) # B 1 1 1
 
         # number of valid pixels times number of channels (classes)
-        valid_pixels = torch.sum(1.0 - mask) * outputs_img.size(1)
+        valid_pixels = torch.sum((1.0 - mask), dim=(2,3), keepdim = True) * outputs_img 
+        # B 1 1 1
 
-        # mean squared error over valid pixels (small epsilon to avoid div0)
-        consist_loss = torch.sum(diff**2) / (valid_pixels + 1e-6)
+        # mean squared error per sample over valid pixels (small epsilon to avoid div0)
+        consist_loss = diff_square / (valid_pixels + 1e-6)
+
+        # mean consist_loss in one batch
+        consist_loss = consist_loss.mean()
 
         integrated_loss = loss_img + alpha * consist_loss + beta * loss_origin
     else:
