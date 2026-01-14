@@ -180,21 +180,6 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
 
     if not is_distributed or dist.get_rank() == 0:
         logger(f"Model moved to {device}\n")
-    
-    # # Init model
-    # if not from_scratch:
-    #     if model_checkpoint_path and os.path.exists(model_checkpoint_path):
-    #         if not is_distributed or dist.get_rank() == 0:
-    #             logger(f"Loading checkpoint from {model_checkpoint_path}...\n")
-            
-    #         state_dict = torch.load(model_checkpoint_path, map_location=device)
-    #         model.load_state_dict(state_dict)
-    #     else:
-    #         if not is_distributed or dist.get_rank() == 0:
-    #             logger(f"Warning: Checkpoint {model_checkpoint_path} not found! Starting from scratch.\n")
-    #         model = fcn_model.init_model(model)
-    # else:
-    #     model = fcn_model.init_model(model)
 
     # Convert to SyncBN if distributed
     if is_distributed and not bn_frozen:
@@ -252,16 +237,18 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
     # Create scheduler using warmup_iters only.
     scheduler = WarmupScheduler(optimizer, base_scheduler, warmup_iters=warmup_iters, warmup_factor=warmup_factor, is_enabled = warmup_is_enabled)
     
+    # Save model path
+    model_path = f"/root/autodl-tmp/models/{date}{info}_A{alpha}B{beta}_.pth"
+
     # Training loop
-    train_losses = []
     origin_val_losses = []
+    best_val_loss = float('inf')
 
     try:
         for epoch in range(num_epochs):
 
             # Train one epoch
             train_loss = train_epoch(model, train_iter, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs)
-            train_losses.append(train_loss)
             
             gc.collect()
             torch.cuda.empty_cache()
@@ -269,6 +256,18 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
             # Validation
             origin_val_loss = validate_epoch(model, val_iter, criterion, device)
             origin_val_losses.append(origin_val_loss)
+
+            # Save the best model in the last 5 epochs
+            if epoch > (num_epochs - 5) and origin_val_loss < best_val_loss :
+                best_val_loss = origin_val_loss
+                if not is_distributed or dist.get_rank() == 0:
+                    model_to_save = model
+                    if hasattr(model_to_save, 'module'): # Unwrap DDP
+                        model_to_save = model_to_save.module
+                    if hasattr(model_to_save, 'model'):  # Unwrap AuxModelWrapper
+                        model_to_save = model_to_save.model
+                        
+                    torch.save(model_to_save.state_dict(), model_path)
 
             if not is_distributed or dist.get_rank() == 0:
                 logger(f"Epoch [{epoch+1}/{num_epochs}] Summary:\n")
@@ -289,16 +288,5 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
     
     if not is_distributed or dist.get_rank() == 0:
         logger("Training completed!\n")
-
-    model_path = f"/root/autodl-tmp/models/{date}{info}_A{alpha}B{beta}_.pth"
-
-    if not is_distributed or dist.get_rank() == 0:
-        model_to_save = model
-        if hasattr(model_to_save, 'module'): # Unwrap DDP
-            model_to_save = model_to_save.module
-        if hasattr(model_to_save, 'model'):  # Unwrap AuxModelWrapper
-            model_to_save = model_to_save.model
-            
-        torch.save(model_to_save.state_dict(), model_path)
 
     return 
