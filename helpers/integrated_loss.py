@@ -58,7 +58,7 @@ def compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_la
         diff_square = torch.sum(diff**2, dim=(1,2,3), keepdim = True) # B 1 1 1
 
         # number of valid pixels times number of channels (classes)
-        valid_pixels = torch.sum((1.0 - mask), dim=(2,3), keepdim = True) * outputs_img 
+        valid_pixels = torch.sum((1.0 - mask), dim=(1,2,3), keepdim = True)  
         # B 1 1 1
 
         # mean squared error per sample over valid pixels (small epsilon to avoid div0)
