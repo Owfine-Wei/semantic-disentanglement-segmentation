@@ -11,7 +11,7 @@ import torch
 from mmseg.apis import init_model
 from mmengine.config import Config
 
-def get_model(num_classes=19, checkpoint=None, device='cuda:0'):
+def get_model(num_classes=19, checkpoint=None):
     """
     Initialize SegFormer (MiT-B3) model based on MMSegmentation configs.
     
@@ -20,6 +20,8 @@ def get_model(num_classes=19, checkpoint=None, device='cuda:0'):
         checkpoint (str, optional): Path to the pretrained weights (.pth).
         device (str): Device to run the model on.
     """
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # 1. Path to the config file
     # Updated to point to the SegFormer-B3 configuration

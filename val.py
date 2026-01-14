@@ -1,7 +1,7 @@
 import os
 import torch
 
-from fcn_model import get_model
+from helpers.fcn_model import get_model
 import helpers.config as config
 from helpers.calculate_pa_miou import calculate_metrics
 from helpers.calculate_saiou import cal_sa_iou

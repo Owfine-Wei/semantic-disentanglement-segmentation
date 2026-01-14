@@ -9,13 +9,15 @@ several visualization images (heatmap, highlight mask, overlays).
 import torch
 import torch.nn.functional as F
 import helpers.config as config
-import fcn_model
+import models
 import cv2
 import numpy as np
 import os
 
 
 # ======== Modified by User ========
+
+model_type = 'FCN'
 
 IMG_DIR = "/root/autodl-tmp/data/Cityscapes/leftImg8bit/val"
 LABEL_DIR = "/root/autodl-tmp/data/Cityscapes/gtFine/val"
@@ -116,9 +118,8 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 		raise TypeError('input_tensor must be a torch.Tensor')
 
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-	device_str = str(device)
 
-	model = fcn_model.get_model(checkpoint=checkpoint_path, device=device_str)
+	model = models.get_model(num_classes=config.NUM_CLASSES,checkpoint=checkpoint_path, model_type=model_type)
 	model = model.to(device)
 	model.eval()
 
