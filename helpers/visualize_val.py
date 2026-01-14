@@ -13,11 +13,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
 
-from fcn_model import get_model
+import models
 import helpers.config as config
 
 # ======== Modified by User ========
+
+model_type = 'FCN'
+
 model_path = ''
+
 # ==================================
 
 
@@ -150,7 +154,7 @@ def main():
 
     print("Loading model...")
 
-    model = get_model(num_classes=19, checkpoint=model_path)
+    model = models.get_model(num_classes=19, checkpoint=model_path, model_type = model_type)
 
     model.to(device)
     model.eval()

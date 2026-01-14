@@ -6,8 +6,8 @@ import torch.distributed as dist
 import os 
 import gc
 import train
+import models
 import itertools
-import fcn_model 
 import helpers.config as config
 from helpers.set_seed import setup_seed
 
@@ -15,6 +15,9 @@ from helpers.set_seed import setup_seed
 if __name__ == '__main__':
     
     # ====================== Modified by User ======================
+
+    # model
+    model_type = 'FCN'
 
     # Train the Model From Scratch ?
     from_scratch = False
@@ -58,7 +61,7 @@ if __name__ == '__main__':
 
         # Create model
         # Disabling pretrained weights to avoid network issues properly
-        model = fcn_model.get_model(num_classes=config.NUM_CLASSES, checkpoint = model_checkpoint_path).to(device) # modify to match your model
+        model = models.get_model(num_classes=config.NUM_CLASSES, checkpoint = model_checkpoint_path,model_type=model_type).to(device) # modify to match your model
 
         train.train(model,device,num_epochs,batch_size,lr_backbone,lr_classifier,alpha,from_scratch,model_checkpoint_path)
 
