@@ -92,7 +92,7 @@
 
 ### 3. 前景 / 背景数据集生成
 
-在确认 `config.py` 中的 `FOREBACK_DATA_DIR` 路径设置正确后，  
+在确认 `config.py` 中的 `FOREBACK_DATA_DIR` 路径设置正确后，在当前文件夹下  
 直接运行以下脚本：
 
 ```bash
@@ -105,6 +105,8 @@ PYTHONPATH=. python helpers/forebackground_data_generator.py
 - 背景数据集（Background）
 
 供后续训练与独立评测使用。
+
+**注：在运行脚本时，环境变量PYTHONPATH需始终为当前文件夹**
 
 ## 二、helpers 目录介绍
 
