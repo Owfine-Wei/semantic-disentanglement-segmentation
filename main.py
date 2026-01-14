@@ -1,3 +1,6 @@
+from helpers.set_seed import setup_seed
+setup_seed(42, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
+
 import torch
 import torch.distributed as dist 
 import os 
@@ -23,8 +26,8 @@ if __name__ == '__main__':
 
     # Search space
     search_space = {
-        'lr_backbone': [5e-5],  
-        'lr_classifier': [5e-5], 
+        'lr_backbone': [2e-6],  
+        'lr_classifier': [1e-4], 
         'batch_size': [2],  # effective_batch_size = batch_size * num_gpus
     }
 
@@ -35,16 +38,10 @@ if __name__ == '__main__':
         search_space['batch_size']
     ))
 
-    # seed
-    seed = 42
-    is_enabled = True
-    
     # ==============================================================
 
     local_rank = int(os.environ.get("LOCAL_RANK", -1))
     is_distributed = local_rank != -1
-    
-    setup_seed(42,is_enabled=is_enabled)
 
     if is_distributed:
         torch.cuda.set_device(local_rank)
@@ -62,11 +59,6 @@ if __name__ == '__main__':
         model = fcn_model.get_model(num_classes=config.NUM_CLASSES, checkpoint = model_checkpoint_path).to(device) # modify to match your model
 
         train.train(model,device,num_epochs,batch_size,lr_backbone,lr_classifier,from_scratch,model_checkpoint_path)
-
-        # Save final model state
-        # Only save on Rank 0
-        # if not is_distributed or dist.get_rank() == 0:
-        #     torch.save(model.state_dict(), config.MODEL_ROOT + date + info + '.pth')
 
         del model 
         gc.collect() 
