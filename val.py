@@ -10,7 +10,7 @@ from data_sds_cityscapes import load_data
 
 # ======== Modified by User ========
 model_paths = [
-    '/root/autodl-tmp/models/_1_13_2026_BL+CSG+CL_both__A1.0B0.0_.pth'
+    '/root/autodl-tmp/models/_1_15_2026_BL+CSG_both__A0.0B1.0_.pth'
     ]
 # ==================================
 
@@ -20,7 +20,7 @@ model_paths = [
 def val(model_path):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = get_model(num_classes=config.NUM_CLASSES, checkpoint=model_path, device = device)
+    model = get_model(num_classes=config.NUM_CLASSES, checkpoint=model_path)
 
 
     print(os.path.basename(model_path))

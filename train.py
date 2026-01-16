@@ -19,11 +19,11 @@ os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
 
 # ========== Modified by User ==========
 
-mode = 'csg+origin' # origin / foreground / background / csg_only / csg+origin / nda
-csg_mode = 'foreground'  # foreground / background / both
+mode = 'csg' # origin / foreground / background / csg_only / csg+origin / nda
+csg_mode = 'both'  # foreground / background / both
 
-alpha = 1.0
-beta  = 0.0
+alpha = 0.0
+beta  = 1.0
 
 momentum = 0.9
 weight_decay = 0.0001
@@ -31,8 +31,8 @@ weight_decay = 0.0001
 bn_frozen = False
 
 # Log
-date = "_1_14_2026"
-info = "_BL+CSG+CL_fore_CE_"
+date = "_1_15_2026"
+info = "_BL+CSG_both_"
 log_root = "/root/autodl-tmp/log/"
 
 # Auxiliary
@@ -92,13 +92,13 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, de
         # Move data to device
         images = images.to(device)
         labels = labels.to(device, dtype=torch.long)
-        if mode == 'csg+origin':
+        if mode == 'csg':
             origin_images = origin_images.to(device)
             origin_labels = origin_labels.to(device, dtype=torch.long)
             mask = mask.to(device, dtype=torch.long)
         
         with torch.cuda.amp.autocast():
-            if mode == 'csg+origin':
+            if mode == 'csg':
                 # Concatenate images to run in a single forward pass
                 # This avoids inplace operation errors and improves efficiency
                 combined_images = torch.cat([images, origin_images], dim=0)

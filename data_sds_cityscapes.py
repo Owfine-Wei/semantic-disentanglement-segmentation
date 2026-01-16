@@ -162,10 +162,9 @@ class CSG_CityScapes(Dataset):
     If `mode=='csg_only'`, items are (image, label, None, None, None).
     """
 
-    def __init__(self, root, mode, split, csg_mode):
+    def __init__(self, root, csg_mode, split ):
         self.root = root
         self.split = split
-        self.mode = mode   # 'csg_only' or 'with_origin'
         self.csg_mode = csg_mode
 
         self.img_dir = config.DIRS['csg']['imgs'] + self.split
@@ -225,10 +224,7 @@ class CSG_CityScapes(Dataset):
         image = self.normalize(image)
         mask = mask.long()
 
-        if self.mode == 'csg_only':
-            return image, label, None, None, None
-        elif self.mode == 'with_origin':
-            return image, label, mask, origin_image, origin_label
+        return image, label, mask, origin_image, origin_label
 
 
 class NDA_CityScapes(Dataset):
@@ -264,10 +260,8 @@ class SDS_CityScapes(Dataset):
             self.dataset = FOREBACK_CityScapes(root, 'foreground', split)
         elif mode == 'background':
             self.dataset = FOREBACK_CityScapes(root, 'background', split)
-        elif mode == 'csg+origin':
-            self.dataset = CSG_CityScapes(root, 'with_origin', split, csg_mode)
-        elif mode == 'csg_only':
-            self.dataset = CSG_CityScapes(root, 'csg_only', split, csg_mode)
+        elif mode == 'csg':
+            self.dataset = CSG_CityScapes(root, csg_mode, split )
         elif mode == 'nda':
             self.dataset = NDA_CityScapes(root, split)
         else:

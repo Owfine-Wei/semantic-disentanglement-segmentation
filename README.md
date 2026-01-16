@@ -252,10 +252,7 @@ load_data(mode, split, csg_mode)
   - background  
     返回背景数据集
 
-  - csg_only  
-    返回类擦除样本
-
-  - csg+origin  
+  - csg
     返回类擦除样本及其对应的原始样本
 
   - nda  
@@ -266,7 +263,7 @@ load_data(mode, split, csg_mode)
 
   - train / val / test
 
-- **csg_mode**（类擦除模式，仅在 csg_only 或 csg+origin 时生效）
+- **csg_mode**（类擦除模式，仅在 csg 时生效）
 
   - foreground  
     仅随机擦除前景类

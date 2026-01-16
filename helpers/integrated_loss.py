@@ -13,7 +13,8 @@ import torch
 
 
 def compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_labels, criterion, mode, alpha, beta):
-    """Compute integrated loss used for CSG training.
+    """
+    Compute integrated loss used for CSG training.
 
     Args:
         outputs_img: logits from the class-erased image branch.
@@ -33,7 +34,7 @@ def compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_la
     # classification loss on the processed (csg) image
     loss_img = criterion(outputs_img, labels.squeeze(1))
 
-    if mode == 'csg+origin':
+    if mode == 'csg' :
         # ensure outputs_origin matches origin_labels spatial size
         if outputs_origin.shape[-2:] != origin_labels.shape[-2:]:
             outputs_origin = F.interpolate(
