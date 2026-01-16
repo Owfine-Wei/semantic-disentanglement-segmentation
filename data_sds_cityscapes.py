@@ -158,8 +158,8 @@ class CSG_CityScapes(Dataset):
     """
     Dataset generating class-erased (CSG) samples, optionally with origin.
 
-    If `mode=='with_origin'`, items are (image, label, mask, origin_image, origin_label).
-    If `mode=='csg_only'`, items are (image, label, None, None, None).
+    Items are (image, label, mask, origin_image, origin_label).
+
     """
 
     def __init__(self, root, csg_mode, split ):

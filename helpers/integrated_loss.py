@@ -23,7 +23,7 @@ def compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_la
         outputs_origin: logits from the original image branch.
         origin_labels: labels for the original image.
         criterion: segmentation loss function (CrossEntropyLoss).
-        mode: when 'csg+origin', include consistency and origin losses.
+        mode: when 'csg', include consistency and origin losses.
         alpha: weight for the consistency loss.
         beta: weight for the origin classification loss.
 

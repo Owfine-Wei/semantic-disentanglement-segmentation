@@ -19,7 +19,7 @@ os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
 
 # ========== Modified by User ==========
 
-mode = 'csg' # origin / foreground / background / csg_only / csg+origin / nda
+mode = 'csg' # origin / foreground / background / csg / nda
 csg_mode = 'both'  # foreground / background / both
 
 alpha = 0.0
