@@ -1,7 +1,3 @@
-from helpers.set_seed import setup_seed
-setup_seed(42, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
-
-
 """
 Utilities to visualize input-gradient contributions (ERF) for segmentation.
 
@@ -34,8 +30,8 @@ out_dir = "/root/autodl-tmp/outputs/val_erf"
 
 checkpoint_path = "/root/autodl-tmp/models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth"
 
+IS_CROP = True 
 CROP_SIZE = (1024,1024)
-
 # ==================================
 
 def get_imgs(img_dir, label_dir):
@@ -91,12 +87,20 @@ def img_process(img_path, label_path):
 	img_tensor = torch.from_numpy(img_chw).unsqueeze(0)
 	label_tensor = torch.from_numpy(label_gray).long().unsqueeze(0).unsqueeze(0)
 
-	# Random Crop
-	i,j,h,w = transforms.RandomCrop.get_params(img_tensor, output_size=CROP_SIZE)
-	img_tensor = TF.crop(img_tensor,i,j,h,w)
-	label_tensor = TF.crop(label_tensor,i,j,h,w)
+	if IS_CROP:
+		h = config.IMG_SIZE[0]
+		w_total = config.IMG_SIZE[1]
+		w_half = w_total // 2
 
-	return img_tensor, label_tensor
+		img_tensor_left = TF.crop(img_tensor, 0, 0, h, w_half)
+		label_tensor_left = TF.crop(label_tensor, 0, 0, h, w_half)
+
+		img_tensor_right = TF.crop(img_tensor, 0, w_half, h, w_total - w_half)
+		label_tensor_right = TF.crop(label_tensor, 0, w_half, h, w_total - w_half) 
+		return (img_tensor_left, img_tensor_right), (label_tensor_left, label_tensor_right)
+	
+	else:
+		return img_tensor, label_tensor
 
 
 def get_grad_mask(label_tensor, semantic):
@@ -152,8 +156,12 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 		logits = logits.unsqueeze(0)
 
 	_, _, h, w = logits.shape
-	if (h, w) != CROP_SIZE:
-		logits = F.interpolate(logits, size=CROP_SIZE, mode='bilinear', align_corners=False)
+	if IS_CROP:
+		if (h, w) != CROP_SIZE:
+			logits = F.interpolate(logits, size=CROP_SIZE, mode='bilinear', align_corners=False)
+	else: 
+		if (h, w) != config.IMG_SIZE:
+			logits = F.interpolate(logits, size=config.IMG_SIZE, mode='bilinear', align_corners=False)
 
 	# if no grad mask requested, return logits directly
 	if grad_mask is None:
@@ -197,7 +205,7 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 	return contrib
 
 
-def show_img(img_path, img_tensor, contrib, out_dir):
+def show_img(img_path, img_tensor, contrib, out_dir, side = 'full'):
 	"""
 	Save visualization images: original, heatmap, highlight mask and overlays.
 
@@ -251,7 +259,7 @@ def show_img(img_path, img_tensor, contrib, out_dir):
 	# convert to RGB for blending
 	heatmap_rgb = cv2.cvtColor(heatmap_bgr, cv2.COLOR_BGR2RGB)
 
-	heat_save = os.path.join(group_dir, f"{file_prefix}_heatmap.png")
+	heat_save = os.path.join(group_dir, f"{file_prefix}_{side}_heatmap.png")
 	cv2.imwrite(heat_save, cv2.cvtColor(heatmap_rgb, cv2.COLOR_RGB2BGR))
 
 	# 2. highlight map: contributions > threshold -> yellow, else light blue
@@ -261,7 +269,7 @@ def show_img(img_path, img_tensor, contrib, out_dir):
 	blue = np.array([0, 0, 255], dtype=np.uint8)
 	highlight[c > threshold] = yellow
 	highlight[c <= threshold] = blue
-	high_save = os.path.join(group_dir, f"{file_prefix}_highlight_mask.png")
+	high_save = os.path.join(group_dir, f"{file_prefix}_{side}_highlight_mask.png")
 	cv2.imwrite(high_save, cv2.cvtColor(highlight, cv2.COLOR_RGB2BGR))
 
 	# 3. overlay heatmap on original (faded)
@@ -269,14 +277,14 @@ def show_img(img_path, img_tensor, contrib, out_dir):
 	orig_f = img_rgb.astype(np.float32)
 	heat_f = heatmap_rgb.astype(np.float32)
 	over_heat = (orig_f * (1 - alpha) + heat_f * alpha).astype(np.uint8)
-	over_heat_save = os.path.join(group_dir, f"{file_prefix}_heatmap_overlay.png")
+	over_heat_save = os.path.join(group_dir, f"{file_prefix}_{side}_heatmap_overlay.png")
 	cv2.imwrite(over_heat_save, cv2.cvtColor(over_heat, cv2.COLOR_RGB2BGR))
 
 	# 4. overlay highlight on original
 	alpha2 = 0.5
 	high_f = highlight.astype(np.float32)
 	over_high = (orig_f * (1 - alpha2) + high_f * alpha2).astype(np.uint8)
-	over_high_save = os.path.join(group_dir, f"{file_prefix}_highlight_overlay.png")
+	over_high_save = os.path.join(group_dir, f"{file_prefix}_{side}_highlight_overlay.png")
 	cv2.imwrite(over_high_save, cv2.cvtColor(over_high, cv2.COLOR_RGB2BGR))
 
 	# done
@@ -293,14 +301,28 @@ def show_erf(checkpoint_path, img_path, label_path, semantic, out_dir):
 	# 1. preprocess image
 	img_tensor, label_tensor = img_process(img_path, label_path)
 
-	# 2. grad mask
-	mask = get_grad_mask(label_tensor, semantic)
+	if IS_CROP:
+		for i in range(2):
 
-	# 3. contribution
-	contrib = get_contirb(checkpoint_path, img_tensor, grad_mask=mask)
+			# 2. grad mask
+			mask = get_grad_mask(label_tensor[i], semantic)
 
-	# 4. show and save
-	show_img(img_path, img_tensor, contrib, out_dir)
+			# 3. contribution
+			contrib = get_contirb(checkpoint_path, img_tensor[i], grad_mask=mask)
+
+			# 4. show and save
+			show_img(img_path, img_tensor[i], contrib, out_dir, 'left' if i == 0 else 'right')
+
+	else:
+
+		# 2. grad mask
+		mask = get_grad_mask(label_tensor, semantic)
+
+		# 3. contribution
+		contrib = get_contirb(checkpoint_path, img_tensor, grad_mask=mask)
+
+		# 4. show and save
+		show_img(img_path, img_tensor, contrib, out_dir)
 
 	return
 
