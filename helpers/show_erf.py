@@ -85,7 +85,7 @@ def img_process(img_path, label_path):
 	img_chw = np.transpose(img_norm, (2, 0, 1)).astype(np.float32)
 
 	img_tensor = torch.from_numpy(img_chw).unsqueeze(0)
-	label_tensor = torch.from_numpy(label_gray).long().unsqueeze(0)
+	label_tensor = torch.from_numpy(label_gray).long().unsqueeze(0).unsqueeze(0)
 
 	# Random Crop
 	i,j,h,w = transforms.RandomCrop.get_params(img_tensor, output_size=CROP_SIZE)
@@ -107,7 +107,7 @@ def get_grad_mask(label_tensor, semantic):
 		raise ValueError(f"Semantic '{semantic}' not found in config.TRAIN_ID_DICT")
 	trainid = config.TRAIN_ID_DICT[semantic]
 
-	mask_tensor = (label_tensor == trainid).unsqueeze(0).unsqueeze(0).long()
+	mask_tensor = (label_tensor == trainid).long()
 
 	return mask_tensor
 
