@@ -9,6 +9,8 @@ several visualization images (heatmap, highlight mask, overlays).
 import torch
 import torch.nn.functional as F
 import helpers.config as config
+import torchvision.transforms.functional as TF
+import torchvision.transforms as transforms
 import models
 import cv2
 import numpy as np
@@ -27,6 +29,8 @@ semantic = 'car'
 out_dir = "/root/autodl-tmp/outputs/val_erf"
 
 checkpoint_path = "/root/autodl-tmp/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth"
+
+CROP_SIZE = (512,1024)
 
 # ==================================
 
@@ -57,16 +61,20 @@ def get_imgs(img_dir, label_dir):
 	return imgs, labels
 
 
-def img_process(img_path):
+def img_process(img_path, label_path):
 	"""
-	Read image, normalize by config mean/std and return CHW tensor.
+	Read image, random crop and normalize by config mean/std and return CHW tensor.
+	Read label, random crop and return 1HW tensor
 
-	Returns a float32 tensor shaped (1, C, H, W).
+	Returns a float32 tensor shaped (1, C, H, W), 
+	Returns a long tensor shaped (1, 1, H, W).
 	"""
 
 	img_bgr = cv2.imread(img_path, cv2.IMREAD_COLOR)
-	if img_bgr is None:
-		raise FileNotFoundError(f"Image not found: {img_path}")
+	label_gray = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+
+	if img_bgr is None or label_gray is None:
+		raise FileNotFoundError(f"Image not found: {img_path} or Label not found: {label_path}")
 
 	img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB).astype(np.float32) / 255.0
 
@@ -77,11 +85,17 @@ def img_process(img_path):
 	img_chw = np.transpose(img_norm, (2, 0, 1)).astype(np.float32)
 
 	img_tensor = torch.from_numpy(img_chw).unsqueeze(0)
+	label_tensor = torch.from_numpy(label_gray).long().unsqueeze(0)
 
-	return img_tensor
+	# Random Crop
+	i,j,h,w = transforms.RandomCrop.get_params(img_tensor, output_size=CROP_SIZE)
+	img_tensor = TF.crop(img_tensor,i,j,h,w)
+	label_tensor = TF.crop(label_tensor,i,j,h,w)
+
+	return img_tensor, label_tensor
 
 
-def get_grad_mask(label_path, semantic):
+def get_grad_mask(label_tensor, semantic):
 	"""
 	Load label image and return a binary mask tensor for `semantic`.
 
@@ -89,17 +103,11 @@ def get_grad_mask(label_path, semantic):
 	the trainId of the requested semantic class.
 	"""
 
-	label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
-	if label is None:
-		raise FileNotFoundError(f"Label not found: {label_path}")
-
 	if semantic not in config.TRAIN_ID_DICT:
 		raise ValueError(f"Semantic '{semantic}' not found in config.TRAIN_ID_DICT")
 	trainid = config.TRAIN_ID_DICT[semantic]
 
-	mask_np = (label == trainid).astype(np.uint8)
-
-	mask_tensor = torch.from_numpy(mask_np).unsqueeze(0).unsqueeze(0).to(torch.long)
+	mask_tensor = (label_tensor == trainid).unsqueeze(0).unsqueeze(0).long()
 
 	return mask_tensor
 
@@ -185,7 +193,7 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 	return contrib
 
 
-def show_img(img_path, contrib, out_dir):
+def show_img(img_path, img_tensor, contrib, out_dir):
 	"""
 	Save visualization images: original, heatmap, highlight mask and overlays.
 
@@ -193,16 +201,19 @@ def show_img(img_path, contrib, out_dir):
 	the original image size and used to create multiple outputs.
 	"""
 
-	# get group dir first
+	# get group dir
 	file_prefix = (os.path.basename(img_path)).replace("_leftImg8bit.png","")
 	group_dir = os.path.join(out_dir, file_prefix)
 	os.makedirs(group_dir, exist_ok=True)
 
-	# 0. read original image (RGB) and save
-	img_bgr = cv2.imread(img_path, cv2.IMREAD_COLOR)
-	if img_bgr is None:
-		raise FileNotFoundError(f"Image not found: {img_path}")
-	img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+	# img_tensor(normalized) -> img_tensor(disnormalized) -> img_np -> img_bgr
+	img_tensor = img_tensor.squeeze(0).cpu()
+	mean = torch.tensor(config.RGB_MEAN).view(3, 1, 1)
+	std = torch.tensor(config.RGB_STD).view(3, 1, 1)
+	img_tensor = img_tensor * std + mean
+
+	img_np = img_tensor.permute(1, 2, 0).numpy()
+	img_rgb = np.clip(img_np * 255.0, 0, 255).astype(np.uint8)
 
 	H, W = img_rgb.shape[:2]
 
@@ -276,16 +287,16 @@ def show_erf(checkpoint_path, img_path, label_path, semantic, out_dir):
 	"""
 
 	# 1. preprocess image
-	img_tensor = img_process(img_path)
+	img_tensor, label_tensor = img_process(img_path, label_path)
 
 	# 2. grad mask
-	mask = get_grad_mask(label_path, semantic)
+	mask = get_grad_mask(label_tensor, semantic)
 
 	# 3. contribution
 	contrib = get_contirb(checkpoint_path, img_tensor, grad_mask=mask)
 
 	# 4. show and save
-	show_img(img_path, contrib, out_dir)
+	show_img(img_path, img_tensor, contrib, out_dir)
 
 	return
 
