@@ -37,7 +37,7 @@ class Origin_CityScapes(Dataset):
         self.label_dir = config.DIRS['origin']['labels'] + self.split
 
         # Store crop size and normalization for transforms
-        self.crop_size = (config.CROP_SIZE['h'], config.CROP_SIZE['w'])
+        self.crop_size = config.CROP_SIZE
         self.normalize = transforms.Normalize(mean=config.RGB_MEAN, std=config.RGB_STD)
 
         self.images = []
@@ -105,7 +105,7 @@ class FOREBACK_CityScapes(Dataset):
         self.img_dir = config.DIRS[mode]['imgs'] + self.split
         self.label_dir = config.DIRS[mode]['labels'] + self.split
 
-        self.crop_size = (config.CROP_SIZE['h'], config.CROP_SIZE['w'])
+        self.crop_size = config.CROP_SIZE
         self.normalize = transforms.Normalize(mean=config.RGB_MEAN, std=config.RGB_STD)
 
         self.images = []
@@ -170,7 +170,7 @@ class CSG_CityScapes(Dataset):
         self.img_dir = config.DIRS['csg']['imgs'] + self.split
         self.label_dir = config.DIRS['csg']['labels'] + self.split
 
-        self.crop_size = (config.CROP_SIZE['h'], config.CROP_SIZE['w'])
+        self.crop_size = config.CROP_SIZE
         self.normalize = transforms.Normalize(mean=config.RGB_MEAN, std=config.RGB_STD)
 
         self.images = []

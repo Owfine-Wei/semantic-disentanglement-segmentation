@@ -1,7 +1,7 @@
 import os
 import torch
 
-from helpers.fcn_model import get_model
+import models
 import helpers.config as config
 from helpers.calculate_pa_miou import calculate_metrics
 from helpers.calculate_saiou import cal_sa_iou
@@ -9,8 +9,9 @@ from data_sds_cityscapes import load_data
 
 
 # ======== Modified by User ========
+model_type = 'SegFormer'
 model_paths = [
-    '/root/autodl-tmp/models/_1_15_2026_BL+CSG_both__A0.0B1.0_.pth'
+    '/root/autodl-tmp/models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth'
     ]
 # ==================================
 
@@ -20,7 +21,7 @@ model_paths = [
 def val(model_path):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = get_model(num_classes=config.NUM_CLASSES, checkpoint=model_path)
+    model = models.get_model(num_classes=config.NUM_CLASSES, checkpoint=model_path, model_type=model_type)
 
 
     print(os.path.basename(model_path))
@@ -51,7 +52,7 @@ BACK_NUM_CLASSES = len(config.BACKGROUND_TRAINIDS)
 def forebackground_val(model_path):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = get_model(num_classes=config.NUM_CLASSES, checkpoint=model_path)
+    model = models.get_model(num_classes=config.NUM_CLASSES, checkpoint=model_path, model_type = model_type)
 
     # print('Testing model on Foreground / Background CityScapes')
     # print(f"Using device: {device}")
