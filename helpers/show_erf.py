@@ -1,3 +1,7 @@
+from helpers.set_seed import setup_seed
+setup_seed(42, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
+
+
 """
 Utilities to visualize input-gradient contributions (ERF) for segmentation.
 
@@ -19,7 +23,7 @@ import os
 
 # ======== Modified by User ========
 
-model_type = 'FCN'
+model_type = 'SegFormer'
 
 IMG_DIR = "/root/autodl-tmp/data/Cityscapes/leftImg8bit/val"
 LABEL_DIR = "/root/autodl-tmp/data/Cityscapes/gtFine/val"
@@ -28,9 +32,9 @@ semantic = 'car'
 
 out_dir = "/root/autodl-tmp/outputs/val_erf"
 
-checkpoint_path = "/root/autodl-tmp/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth"
+checkpoint_path = "/root/autodl-tmp/models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth"
 
-CROP_SIZE = (512,1024)
+CROP_SIZE = (1024,1024)
 
 # ==================================
 
@@ -148,8 +152,8 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 		logits = logits.unsqueeze(0)
 
 	_, _, h, w = logits.shape
-	if (h, w) != config.IMG_SIZE:
-		logits = F.interpolate(logits, size=config.IMG_SIZE, mode='bilinear', align_corners=False)
+	if (h, w) != CROP_SIZE:
+		logits = F.interpolate(logits, size=CROP_SIZE, mode='bilinear', align_corners=False)
 
 	# if no grad mask requested, return logits directly
 	if grad_mask is None:
