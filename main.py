@@ -1,6 +1,8 @@
 from helpers.set_seed import setup_seed
 setup_seed(42, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
 
+# test
+
 import torch
 import torch.distributed as dist 
 import os 
