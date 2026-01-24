@@ -2,23 +2,23 @@ from helpers.set_seed import setup_seed
 setup_seed(42, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
 
 import os
+import gc
+import itertools
+
 import torch
 from torch import nn
 import torch.nn.functional as F
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-import gc
-import itertools
-import torch.distributed as dist 
-import models
-from helpers.set_seed import setup_seed
 
-from datasets import get_config
-from datasets.dataset_impl import load_data
+import models
+from configs import get_config
 from helpers.Logger import Logger
-from helpers.integrated_loss import compute_integrated_loss
+from helpers.set_seed import setup_seed
+from datasets.dataset_impl import load_data
 from helpers.Aux_loss import AuxModelWrapper
 from helpers.Warmup_scheduler import WarmupScheduler
+from helpers.integrated_loss import compute_integrated_loss
 
 os.environ['TRANSFORMERS_OFFLINE'] = '1'
 os.environ['HF_DATASETS_OFFLINE'] = '1'
@@ -32,7 +32,7 @@ mode = 'csg' # origin / foreground / background / csg / nda
 csg_mode = 'both'  # foreground / background / both
 
 # model
-model_type = 'FCN'
+model_name = 'fcn'
 
 # Train the Model From Scratch ?
 from_scratch = False
@@ -40,7 +40,7 @@ from_scratch = False
 model_checkpoint_path = '/root/autodl-tmp/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth'
 
 # Basic Configs
-num_epochs = 15
+num_epochs = 2
 
 # Search space
 search_space = {
@@ -56,7 +56,7 @@ grid_search_configs = list(itertools.product(
     search_space['batch_size']
 ))
 
-alpha = 0.0
+alpha = 1.0
 beta  = 1.0
 
 momentum = 0.9
@@ -65,8 +65,8 @@ weight_decay = 0.0001
 bn_frozen = False
 
 # Log
-date = "_1_15_2026"
-info = "_BL+CSG_both_"
+date = "_1_24_2026"
+info = "_ONLYFORTEST_"
 log_root = "/root/autodl-tmp/log/"
 
 # Auxiliary
@@ -332,9 +332,10 @@ def main():
 
         # Create model
         # Disabling pretrained weights to avoid network issues properly
-        model = models.get_model(num_classes=config.NUM_CLASSES, checkpoint = model_checkpoint_path,model_type=model_type).to(device) # modify to match your model
+        get_model_function = models.get_model(model_name)
+        model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint = model_checkpoint_path).to(device) # modify to match your model
 
-        train.train(model,device,num_epochs,batch_size,lr_backbone,lr_classifier,from_scratch,model_checkpoint_path)
+        train(model,device,num_epochs,batch_size,lr_backbone,lr_classifier,from_scratch,model_checkpoint_path)
 
         del model 
         gc.collect() 

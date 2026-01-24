@@ -8,7 +8,7 @@ several visualization images (heatmap, highlight mask, overlays).
 
 import torch
 import torch.nn.functional as F
-from datasets import get_config
+from configs import get_config
 import torchvision.transforms.functional as TF
 import torchvision.transforms as transforms
 import models
@@ -21,7 +21,7 @@ import os
 
 dataset_name = 'cityscapes'
 
-model_type = 'SegFormer'
+model_name = 'SegFormer'
 
 IMG_DIR = "/root/autodl-tmp/data/Cityscapes/leftImg8bit/val"
 LABEL_DIR = "/root/autodl-tmp/data/Cityscapes/gtFine/val"
@@ -139,7 +139,8 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-	model = models.get_model(num_classes=config.NUM_CLASSES,checkpoint=checkpoint_path, model_type=model_type)
+	get_model_function = models.get_model(model_name)
+	model = get_model_function(num_classes=config.NUM_CLASSES,checkpoint=checkpoint_path)
 	model = model.to(device)
 	model.eval()
 

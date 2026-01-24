@@ -5,9 +5,9 @@ class definitions, and visualization settings used across training and
 evaluation of the semantic segmentation project.
 """
 
-from datasets import register_config
+from .registry import register_configs
 
-@register_config("cityscapes")
+@register_configs("cityscapes")
 class CityScapesConfig:
 
     # ==============================================================================
@@ -157,8 +157,6 @@ class CityScapesConfig:
 
     IMG_SIZE = (1024, 2048)
 
-    IMG_SUFFIX = 'leftImg8bit.png'
-    LABEL_SUFFIX = 'labelTrainIds.png'
 
     # ==============================================================================
     # ERASED CLASSES SAMPLES (CES)

@@ -37,18 +37,14 @@ class Origin_Dataset(Dataset):
         if not os.path.exists(self.img_dir) or not os.path.exists(self.label_dir):
             raise FileNotFoundError(f"Directory not found: {self.img_dir} or {self.label_dir}")
 
-        img_suffix = config.IMG_SUFFIX
         for root_path, _, files in os.walk(self.img_dir):
             for file in files:
-                if file.endswith(img_suffix):
-                    self.images.append(os.path.join(root_path, file))
+                self.images.append(os.path.join(root_path, file))
         self.images.sort()
 
-        label_suffix = config.LABEL_SUFFIX
         for root_path, _, files in os.walk(self.label_dir):
             for file in files:
-                if file.endswith(label_suffix):
-                    self.labels.append(os.path.join(root_path, file))
+                self.labels.append(os.path.join(root_path, file))
         self.labels.sort()
 
         if len(self.images) == 0:
@@ -106,18 +102,14 @@ class FOREBACK_Dataset(Dataset):
         if not os.path.exists(self.img_dir) or not os.path.exists(self.label_dir):
             raise FileNotFoundError(f"Directory not found: {self.img_dir} or {self.label_dir}")
 
-        img_suffix = config.IMG_SUFFIX
         for root_path, _, files in os.walk(self.img_dir):
             for file in files:
-                if file.endswith(img_suffix):
-                    self.images.append(os.path.join(root_path, file))
+                self.images.append(os.path.join(root_path, file))
         self.images.sort()
 
-        label_suffix = 'labelTrainIds_fg.png' if self.mode == 'foreground' else 'labelTrainIds_bg.png'
         for root_path, _, files in os.walk(self.label_dir):
             for file in files:
-                if file.endswith(label_suffix):
-                    self.labels.append(os.path.join(root_path, file))
+                self.labels.append(os.path.join(root_path, file))
         self.labels.sort()
 
     def __len__(self):
@@ -169,18 +161,14 @@ class CSG_Dataset(Dataset):
         self.images = []
         self.labels = []
 
-        img_suffix = config.IMG_SUFFIX
         for root_path, _, files in os.walk(self.img_dir):
             for file in files:
-                if file.endswith(img_suffix):
-                    self.images.append(os.path.join(root_path, file))
+                self.images.append(os.path.join(root_path, file))
         self.images.sort()
 
-        label_suffix = 'labelTrainIds.png'
         for root_path, _, files in os.walk(self.label_dir):
             for file in files:
-                if file.endswith(label_suffix):
-                    self.labels.append(os.path.join(root_path, file))
+                self.labels.append(os.path.join(root_path, file))
         self.labels.sort()
 
     def __len__(self):

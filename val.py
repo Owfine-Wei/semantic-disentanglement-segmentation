@@ -2,17 +2,17 @@ import os
 import torch
 
 import models
-from datasets import get_config
+from configs import get_config
 from helpers.calculate_pa_miou import calculate_metrics
 from helpers.calculate_saiou import cal_sa_iou
-from datasets import load_data 
+from datasets.dataset_impl import load_data 
 
 
 # ======== Modified by User ========
 dataset_name = 'cityscapes'
-model_type = 'SegFormer'
+model_name = 'fcn'
 model_paths = [
-    '/root/autodl-tmp/models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth'
+    '/root/autodl-tmp/models/_1_24_2026_ONLYFORTEST__A1.0B1.0_.pth'
     ]
 # ==================================
 
@@ -23,7 +23,8 @@ config = get_config(dataset_name)
 def val(model_path):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = models.get_model(num_classes=config.NUM_CLASSES, checkpoint=model_path, model_type=model_type)
+    get_model_function = models.get_model(model_name)
+    model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint=model_path)
 
 
     print(os.path.basename(model_path))
@@ -54,7 +55,8 @@ BACK_NUM_CLASSES = len(config.BACKGROUND_TRAINIDS)
 def forebackground_val(model_path):
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = models.get_model(num_classes=config.NUM_CLASSES, checkpoint=model_path, model_type = model_type)
+    get_model_function = models.get_model(model_name)
+    model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint=model_path)
 
     # print('Testing model on Foreground / Background CityScapes')
     # print(f"Using device: {device}")

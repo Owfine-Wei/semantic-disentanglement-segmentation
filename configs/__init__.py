@@ -1,13 +1,16 @@
-# configs/__init__.py
+# models/__init__.py
 import os
 import importlib
+from .registry import CONFIGS_REGISTRY # 从中转站拿字典
 
-# 自动扫描当前 configs 文件夹
+# 自动扫描逻辑保持不变
 config_dir = os.path.dirname(__file__)
-
 for file in os.listdir(config_dir):
-    # 只要是 .py 文件且不是 __init__.py 本身
-    if file.endswith(".py") and file != "__init__.py":
+    if file.endswith(".py") and file not in ["__init__.py", "registry.py"]:
         module_name = f"configs.{file[:-3]}"
-        # 动态导入。一旦导入，文件里的 @register_config 就会生效
         importlib.import_module(module_name)
+
+def get_config(name):
+    if name not in CONFIGS_REGISTRY:
+        raise KeyError(f"模型 '{name}' 尚未注册！可用: {list(CONFIGS_REGISTRY.keys())}")
+    return CONFIGS_REGISTRY[name]

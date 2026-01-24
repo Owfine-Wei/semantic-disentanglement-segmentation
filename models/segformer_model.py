@@ -8,7 +8,7 @@ class count, and optionally loads weights from a checkpoint.
 
 import os
 import torch
-from models import register_models
+from .registry import register_models
 from mmseg.apis import init_model
 from mmengine.config import Config
 

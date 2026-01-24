@@ -10,7 +10,7 @@ dataset creation.
 import os
 import cv2
 import numpy as np
-from datasets import get_config
+from configs import get_config
 
 # ========== Modified by User ==========
 dataset_name = 'cityscapes'

@@ -20,7 +20,7 @@ from helpers.visualize_val import (preprocess_image, decode_segmap, overlay_imag
 
 dataset_name = 'cityscapes'
 
-model_type = 'FCN'
+model_name = 'fcn'
 
 model_path = ''
 
@@ -143,7 +143,8 @@ def main():
 
     print("Loading model...")
 
-    model = models.get_model(num_classes=19, checkpoint=model_path, model_type=model_type)
+    get_model_function = models.get_model(model_name)
+    model = get_model_function(num_classes=19, checkpoint=model_path)
     model.to(device)
     model.eval()
 
