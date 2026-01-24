@@ -1,9 +1,8 @@
-# models/__init__.py
+# configs/__init__.py
 import os
 import importlib
-from .registry import CONFIGS_REGISTRY # 从中转站拿字典
+from .registry import CONFIGS_REGISTRY 
 
-# 自动扫描逻辑保持不变
 config_dir = os.path.dirname(__file__)
 for file in os.listdir(config_dir):
     if file.endswith(".py") and file not in ["__init__.py", "registry.py"]:
@@ -12,5 +11,5 @@ for file in os.listdir(config_dir):
 
 def get_config(name):
     if name not in CONFIGS_REGISTRY:
-        raise KeyError(f"模型 '{name}' 尚未注册！可用: {list(CONFIGS_REGISTRY.keys())}")
+        raise KeyError(f"Config '{name}' is not registered")
     return CONFIGS_REGISTRY[name]

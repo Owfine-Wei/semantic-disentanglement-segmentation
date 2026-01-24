@@ -1,9 +1,7 @@
-# models/__init__.py
 import os
 import importlib
-from .registry import MODELS_REGISTRY # 从中转站拿字典
+from .registry import MODELS_REGISTRY 
 
-# 自动扫描逻辑保持不变
 model_dir = os.path.dirname(__file__)
 for file in os.listdir(model_dir):
     if file.endswith(".py") and file not in ["__init__.py", "registry.py"]:
@@ -12,5 +10,5 @@ for file in os.listdir(model_dir):
 
 def get_model(name):
     if name not in MODELS_REGISTRY:
-        raise KeyError(f"模型 '{name}' 尚未注册！可用: {list(MODELS_REGISTRY.keys())}")
+        raise KeyError(f"Model '{name}' is not registered !")
     return MODELS_REGISTRY[name]
