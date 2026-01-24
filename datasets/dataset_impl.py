@@ -1,6 +1,7 @@
 import os
-import cv2
 import torch
+import numpy as np
+from PIL import Image
 import random
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as TF
@@ -57,9 +58,11 @@ class Origin_Dataset(Dataset):
         img_path = self.images[idx]
         label_path = self.labels[idx]
 
-        image = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+        image_pil = Image.open(img_path).convert('RGB')
+        image = np.array(image_pil)
+        
+        label_pil = Image.open(label_path)
+        label = np.array(label_pil)
 
         # to tensor CxHxW, normalized to [0,1]
         image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
@@ -119,10 +122,13 @@ class FOREBACK_Dataset(Dataset):
         img_path = self.images[idx]
         label_path = self.labels[idx]
 
-        image = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        label = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+        image_pil = Image.open(img_path).convert('RGB')
+        image = np.array(image_pil)
+        
+        label_pil = Image.open(label_path)
+        label = np.array(label_pil)
 
+        # to tensor CxHxW, normalized to [0,1]
         image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
         label = torch.from_numpy(label).long()
 
@@ -178,9 +184,8 @@ class CSG_Dataset(Dataset):
         img_path = self.images[idx]
         label_path = self.labels[idx]
 
-        origin_image_np = cv2.imread(img_path, cv2.IMREAD_COLOR)
-        origin_image_np = cv2.cvtColor(origin_image_np, cv2.COLOR_BGR2RGB)
-        origin_label_np = cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+        origin_image_np = np.array(Image.open(img_path).convert('RGB'))
+        origin_label_np = np.array(Image.open(label_path))
 
         # to tensors
         origin_image = torch.from_numpy(origin_image_np).permute(2, 0, 1).float() / 255.0
