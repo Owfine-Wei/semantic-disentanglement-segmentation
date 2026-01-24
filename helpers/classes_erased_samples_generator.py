@@ -9,10 +9,7 @@ foreground, background, or both according to `mode`.
 import random
 import torch
 
-import helpers.config as config
-
-
-def classes_erased_samples_generator(origin_image, origin_label, mode):
+def classes_erased_samples_generator(config, origin_image, origin_label, mode):
     """Return image/label/mask with selected classes erased.
 
     Args:

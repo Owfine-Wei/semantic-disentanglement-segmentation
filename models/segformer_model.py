@@ -8,10 +8,12 @@ class count, and optionally loads weights from a checkpoint.
 
 import os
 import torch
+from models import register_models
 from mmseg.apis import init_model
 from mmengine.config import Config
 
-def get_model(num_classes=19, checkpoint=None):
+@register_models("segformer")
+def get_model(num_classes, checkpoint=None):
     """
     Initialize SegFormer (MiT-B3) model based on MMSegmentation configs.
     

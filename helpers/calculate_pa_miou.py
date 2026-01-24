@@ -8,11 +8,10 @@ MulticlassAccuracy (pixel accuracy).
 import torch
 import torch.nn.functional as F
 
-import helpers.config as config
 from torchmetrics.classification import (MulticlassJaccardIndex, MulticlassAccuracy)
 
 
-def calculate_metrics(model, val_loader, device, num_classes=config.NUM_CLASSES):
+def calculate_metrics(model, val_loader, device, num_classes):
     
     """
     Evaluate `model` on `val_loader` and return (mIoU, pixel_accuracy).

@@ -8,7 +8,7 @@ several visualization images (heatmap, highlight mask, overlays).
 
 import torch
 import torch.nn.functional as F
-import helpers.config as config
+from datasets import get_config
 import torchvision.transforms.functional as TF
 import torchvision.transforms as transforms
 import models
@@ -18,6 +18,8 @@ import os
 
 
 # ======== Modified by User ========
+
+dataset_name = 'cityscapes'
 
 model_type = 'SegFormer'
 
@@ -33,6 +35,8 @@ checkpoint_path = "/root/autodl-tmp/models/segformer_mit-b3_8x1_1024x1024_160k_c
 IS_CROP = True 
 CROP_SIZE = (1024,1024)
 # ==================================
+
+config = get_config(dataset_name)
 
 def get_imgs(img_dir, label_dir):
 	"""

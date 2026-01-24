@@ -10,9 +10,13 @@ dataset creation.
 import os
 import cv2
 import numpy as np
+from datasets import get_config
 
-import helpers.config as config
+# ========== Modified by User ==========
+dataset_name = 'cityscapes'
+# ======================================
 
+config = get_config(dataset_name)
 
 def create_foreback_data():
     """

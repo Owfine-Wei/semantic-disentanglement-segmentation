@@ -6,8 +6,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 import gc
 
-import helpers.config as config
-from data_sds_cityscapes import load_data
+from datasets import (load_data, get_config)
 from helpers.Logger import Logger
 from helpers.integrated_loss import compute_integrated_loss
 from helpers.Aux_loss import AuxModelWrapper
@@ -18,6 +17,8 @@ os.environ['HF_DATASETS_OFFLINE'] = '1'
 os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
 
 # ========== Modified by User ==========
+
+dataset_name = 'cityscapes'
 
 mode = 'csg' # origin / foreground / background / csg / nda
 csg_mode = 'both'  # foreground / background / both
@@ -45,6 +46,9 @@ warmup_iters = 1000
 warmup_factor = 0.01
 
 # ======================================
+
+# config
+config = get_config(dataset_name)
 
 # Log
 logger = Logger(date=date, info=info, log_root = log_root)
@@ -172,8 +176,8 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
         logger(f"lr_backbone:{lr_backbone}, lr_classifier:{lr_classifier}, epochs:{num_epochs}, alpha:{alpha}, beta:{beta}\n")
 
     # Load dataset
-    train_iter = load_data(root=config.DATA_DIR, mode=mode, split='train', csg_mode=csg_mode, batch_size=batch_size, num_workers=12, distributed=is_distributed)
-    val_iter = load_data(root=config.DATA_DIR, mode='origin', split='val', batch_size=batch_size, num_workers=4, distributed=False)
+    train_iter = load_data(config, mode=mode, split='train', csg_mode=csg_mode, batch_size=batch_size, num_workers=12, distributed=is_distributed)
+    val_iter = load_data(config, mode='origin', split='val', batch_size=batch_size, num_workers=4, distributed=False)
     
     # Create model
     model = model.to(device)

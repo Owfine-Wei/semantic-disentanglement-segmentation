@@ -8,10 +8,12 @@ checkpoint onto the requested device.
 
 import os
 import torch
+from models import register_models
 from mmseg.apis import init_model
 from mmengine.config import Config
 
-def get_model(num_classes=19, checkpoint=None):
+@register_models("fcn")
+def get_model(num_classes, checkpoint=None):
 
     """
     Initialize a standard FCN-Res50-D8 model based on mmseg configs.

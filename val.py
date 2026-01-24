@@ -2,20 +2,22 @@ import os
 import torch
 
 import models
-import helpers.config as config
+from datasets import get_config
 from helpers.calculate_pa_miou import calculate_metrics
 from helpers.calculate_saiou import cal_sa_iou
-from data_sds_cityscapes import load_data 
+from datasets import load_data 
 
 
 # ======== Modified by User ========
+dataset_name = 'cityscapes'
 model_type = 'SegFormer'
 model_paths = [
     '/root/autodl-tmp/models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth'
     ]
 # ==================================
 
-
+# Get config
+config = get_config(dataset_name)
 
 # Test On Origin CityScapes
 def val(model_path):
@@ -31,9 +33,9 @@ def val(model_path):
     model.to(device)
     model.eval()
 
-    val_iter = load_data(root=config.DATA_DIR, mode='origin', split='val')
+    val_iter = load_data(config, mode='origin', split='val')
 
-    miou, pa = calculate_metrics(model, val_iter, device)
+    miou, pa = calculate_metrics(model, val_iter, device, num_classes=config.NUM_CLASSES)
     miou = miou.item()
     pa = pa.item()
 
@@ -60,8 +62,8 @@ def forebackground_val(model_path):
     model.to(device)
     model.eval()
 
-    fore_iter = load_data(config.DATA_DIR, mode='foreground', split='val')
-    back_iter = load_data(config.DATA_DIR, mode='background', split='val')
+    fore_iter = load_data(config, mode='foreground', split='val')
+    back_iter = load_data(config, mode='background', split='val')
 
     fore_iou, back_iou, sa_iou = cal_sa_iou(model, fore_iter, back_iter, config.FOREGROUND_TRAINIDS, config.BACKGROUND_TRAINIDS, device)
 

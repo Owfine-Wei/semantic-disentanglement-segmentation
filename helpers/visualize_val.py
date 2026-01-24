@@ -14,9 +14,11 @@ import matplotlib.pyplot as plt
 import torchvision.transforms as transforms
 
 import models
-import helpers.config as config
+from datasets import get_config
 
 # ======== Modified by User ========
+
+dataset_name = 'cityscapes'
 
 model_type = 'FCN'
 
@@ -24,6 +26,7 @@ model_path = ''
 
 # ==================================
 
+config = get_config(dataset_name)
 
 # To_Tensor and Normalize the Image
 def preprocess_image(image_path, mean, std):

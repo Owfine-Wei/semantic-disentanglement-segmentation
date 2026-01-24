@@ -13,10 +13,12 @@ import random
 import matplotlib.pyplot as plt
 
 import models 
-import helpers.config as config
+from datasets import get_config
 from helpers.visualize_val import (preprocess_image, decode_segmap, overlay_images)
 
 # ======== Modified by User ========
+
+dataset_name = 'cityscapes'
 
 model_type = 'FCN'
 
@@ -24,6 +26,7 @@ model_path = ''
 
 # ==================================
 
+config = get_config(dataset_name)
 
 def visualize_foreback_test(model, device, img_root, mask_root, output_dir, mean, std, task_name):
     """

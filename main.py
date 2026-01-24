@@ -9,13 +9,16 @@ import gc
 import train
 import models
 import itertools
-import helpers.config as config
+from datasets import get_config
 from helpers.set_seed import setup_seed
 
 
 if __name__ == '__main__':
     
     # ====================== Modified by User ======================
+
+    # data
+    dataset_name = 'cityscapes'
 
     # model
     model_type = 'FCN'
@@ -43,6 +46,8 @@ if __name__ == '__main__':
     ))
 
     # ==============================================================
+
+    config = get_config(dataset_name)
 
     local_rank = int(os.environ.get("LOCAL_RANK", -1))
     is_distributed = local_rank != -1
