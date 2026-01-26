@@ -5,7 +5,6 @@ import os
 import gc
 import yaml
 import argparse
-import itertools
 from easydict import EasyDict as edict
 
 import torch
