@@ -12,7 +12,7 @@ from datasets.dataset_impl import load_data
 dataset_name = 'cityscapes'
 model_name = 'fcn'
 model_paths = [
-    '/root/autodl-tmp/models/_1_24_2026_ONLYFORTEST__A1.0B1.0_.pth'
+    '/mnt/d/SemanticSegmentation/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth'
     ]
 # ==================================
 
@@ -67,11 +67,11 @@ def forebackground_val(model_path):
     fore_iter = load_data(config, mode='foreground', split='val')
     back_iter = load_data(config, mode='background', split='val')
 
-    fore_iou, back_iou, sa_iou = cal_sa_iou(model, fore_iter, back_iter, config.FOREGROUND_TRAINIDS, config.BACKGROUND_TRAINIDS, device)
+    fiou_dict, fore_iou, biou_dict, back_iou, sa_iou = cal_sa_iou(model, fore_iter, back_iter, config.FOREGROUND_TRAINIDS, config.BACKGROUND_TRAINIDS, device)
 
     # print(f"Foreground Data miou: {fore_iou:.5f}\nBackground Data miou: {back_iou:.5f}\nSA miou: {sa_iou}")
 
-    return fore_iou, back_iou, sa_iou
+    return fiou_dict, fore_iou, biou_dict, back_iou, sa_iou
 
 
 
@@ -79,9 +79,28 @@ if __name__ == "__main__" :
 
     for i in range(len(model_paths)):
         miou, pa = val(model_paths[i])
-        fore_iou, back_iou, sa_iou = forebackground_val(model_paths[i])
+        fiou_dict_id, fore_iou, biou_dict_id, back_iou, sa_iou = forebackground_val(model_paths[i])
+
+        id_to_name = {v: k for k, v in config.TRAIN_ID_DICT.items()}
+
+        fiou_dict_name = {id_to_name[int(k)]: v for k, v in fiou_dict_id.items()}
+        biou_dict_name = {id_to_name[int(k)]: v for k, v in biou_dict_id.items()}
 
         print("\n" + "=" * 50)
+
+        print(f"{'Semantic Class':<20} | {'mIoU (%)':>10}")
+        print("-" * 33)
+        for name, score in fiou_dict_name.items():
+            print(f"{name:<20} | {score * 100:>10.2f}%")
+
+        print("=" * 50)
+
+        print(f"{'Semantic Class':<20} | {'mIoU (%)':>10}")
+        print("-" * 33)
+        for name, score in biou_dict_name.items():
+            print(f"{name:<20} | {score * 100:>10.2f}%")
+        
+        print("=" * 50)
         print(f"{'FINAL EVALUATION SUMMARY':^50}")
         print("=" * 50)
         print(f"{'Metric':<30} | {'Value':>15}")

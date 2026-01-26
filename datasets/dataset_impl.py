@@ -95,12 +95,14 @@ class FOREBACK_Dataset(Dataset):
 
         self.img_dir = config.DIRS[mode]['imgs'] + self.split
         self.label_dir = config.DIRS[mode]['labels'] + self.split
+        self.mask_dir = config.DIRS[mode]['masks'] + self.split
 
         self.crop_size = config.CROP_SIZE
         self.normalize = transforms.Normalize(mean=config.RGB_MEAN, std=config.RGB_STD)
 
         self.images = []
         self.labels = []
+        self.masks = []
 
         if not os.path.exists(self.img_dir) or not os.path.exists(self.label_dir):
             raise FileNotFoundError(f"Directory not found: {self.img_dir} or {self.label_dir}")
@@ -115,12 +117,18 @@ class FOREBACK_Dataset(Dataset):
                 self.labels.append(os.path.join(root_path, file))
         self.labels.sort()
 
+        for root_path, _, files in os.walk(self.mask_dir):
+            for file in files:
+                self.masks.append(os.path.join(root_path, file))
+        self.masks.sort()
+
     def __len__(self):
         return len(self.images)
 
     def __getitem__(self, idx):
         img_path = self.images[idx]
         label_path = self.labels[idx]
+        mask_path = self.masks[idx]
 
         image_pil = Image.open(img_path).convert('RGB')
         image = np.array(image_pil)
@@ -128,9 +136,13 @@ class FOREBACK_Dataset(Dataset):
         label_pil = Image.open(label_path)
         label = np.array(label_pil)
 
+        mask_pil = Image.open(mask_path)
+        mask = np.array(mask_pil)
+
         # to tensor CxHxW, normalized to [0,1]
         image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
         label = torch.from_numpy(label).long()
+        mask = torch.from_numpy(mask).long()
 
         if self.split == 'train':
             # sync random crop + flip
@@ -142,7 +154,7 @@ class FOREBACK_Dataset(Dataset):
                 label = TF.hflip(label)
 
         image = self.normalize(image)
-        return image, label, None, None, None
+        return image, label, mask, None, None
         
 
 class CSG_Dataset(Dataset):
