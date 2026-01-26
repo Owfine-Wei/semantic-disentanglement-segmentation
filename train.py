@@ -3,7 +3,10 @@ setup_seed(42, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
 
 import os
 import gc
+import yaml
+import argparse
 import itertools
+from easydict import EasyDict as edict
 
 import torch
 from torch import nn
@@ -16,7 +19,6 @@ from configs import get_config
 from helpers.Logger import Logger
 from helpers.set_seed import setup_seed
 from datasets.dataset_impl import load_data
-from helpers.Aux_loss import AuxModelWrapper
 from helpers.Warmup_scheduler import WarmupScheduler
 from helpers.integrated_loss import compute_integrated_loss
 
@@ -24,67 +26,23 @@ os.environ['TRANSFORMERS_OFFLINE'] = '1'
 os.environ['HF_DATASETS_OFFLINE'] = '1'
 os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
 
-# ========== Modified by User ==========
+parser = argparse.ArgumentParser(description='Train')
+parser.add_argument('--train_config_path', default='', help='.yaml file for training', required=True)
+arg = parser.parse_args()
 
-dataset_name = 'cityscapes'
+def load_train_config(config_path):
+    with open(config_path, 'r', encoding='utf-8') as f:
+        train_config = yaml.safe_load(f)
+        train_config = edict(train_config)
+    return train_config
 
-mode = 'csg' # origin / foreground / background / csg / nda
-csg_mode = 'both'  # foreground / background / both
-
-# model
-model_name = 'fcn'
-
-# Train the Model From Scratch ?
-from_scratch = False
-# If not from scratch (.pth path)
-model_checkpoint_path = '/root/autodl-tmp/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth'
-
-# Basic Configs
-num_epochs = 2
-
-# Search space
-search_space = {
-    'lr_backbone': [1e-6],  
-    'lr_classifier': [1e-5], 
-    'batch_size': [4],  # effective_batch_size = batch_size * num_gpus
-}
-
-# Grid search config
-grid_search_configs = list(itertools.product(
-    search_space['lr_backbone'],
-    search_space['lr_classifier'],
-    search_space['batch_size']
-))
-
-alpha = 1.0
-beta  = 1.0
-
-momentum = 0.9
-weight_decay = 0.0001
-
-bn_frozen = False
-
-# Log
-date = "_1_24_2026"
-info = "_ONLYFORTEST_"
-log_root = "/root/autodl-tmp/log/"
-
-# Auxiliary
-aux_is_enabled = False
-aux_weight = 0.2
-
-# Learning rate warmup (steps)
-warmup_is_enabled = True
-warmup_iters = 1000
-warmup_factor = 0.01
-
-# ======================================
+train_config = load_train_config(arg.train_config_path)
 
 # config
-config = get_config(dataset_name)
+config = get_config(train_config.dataset.name)
 
 # Log
-logger = Logger(date=date, info=info, log_root = log_root)
+logger = Logger(date=train_config.logging.date, info=train_config.logging.info, log_root = train_config.logging.root)
 
 # DDP
 local_rank = int(os.environ.get("LOCAL_RANK", -1))
@@ -103,7 +61,7 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, de
 
     model.train()
 
-    if bn_frozen:
+    if train_config.train.bn_frozen:
         for m in model.modules():
             if isinstance(m, (nn.BatchNorm2d, nn.BatchNorm1d, nn.BatchNorm3d)):
                 m.eval()
@@ -126,40 +84,29 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, de
         # Move data to device
         images = images.to(device)
         labels = labels.to(device, dtype=torch.long)
-        if mode == 'csg':
+        if train_config.dataset.mode == 'csg':
             origin_images = origin_images.to(device)
             origin_labels = origin_labels.to(device, dtype=torch.long)
             mask = mask.to(device, dtype=torch.long)
         
         with torch.cuda.amp.autocast():
-            if mode == 'csg':
+            if train_config.dataset.mode == 'csg':
                 # Concatenate images to run in a single forward pass
                 # This avoids inplace operation errors and improves efficiency
                 combined_images = torch.cat([images, origin_images], dim=0)
-                combined_main_out, combined_aux_out = model(combined_images)
+                combined_main_out = model(combined_images)
                 outputs_img, outputs_origin = torch.split(combined_main_out, images.size(0), dim=0)
 
-                if combined_aux_out is not None:
-                    aux_img, aux_origin = torch.split(combined_aux_out, images.size(0), dim=0)
             else:
-                outputs_img, aux_img = model(images)
-                outputs_origin, aux_origin = None, None
+                outputs_img = model(images)
+                outputs_origin = None
             
             # Resize outputs to match labels if necessary
             if outputs_img.shape[-2:] != labels.shape[-2:]:
                 outputs_img = F.interpolate(outputs_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
-            if aux_is_enabled:
-                if aux_img.shape[-2:] != labels.shape[-2:]:
-                        aux_img = F.interpolate(aux_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
 
 
-            main_integrated_loss = compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_labels, criterion, mode, alpha, beta)
-            if aux_is_enabled:
-                aux_integrated_loss = compute_integrated_loss(aux_img, labels, mask, aux_origin, origin_labels, criterion, mode, alpha, beta)
-
-                integrated_loss = main_integrated_loss + aux_weight * aux_integrated_loss
-            else:
-                integrated_loss = main_integrated_loss
+            integrated_loss = compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_labels, criterion, train_config.dataset.mode, train_config.loss.alpha, train_config.loss.beta)
 
         # Backward pass
         scaler.scale(integrated_loss).backward()
@@ -203,10 +150,10 @@ def validate_epoch(model, val_loader, criterion, device):
 def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, from_scratch = True, model_checkpoint_path = None):
 
     if not is_distributed or dist.get_rank() == 0:
-        logger(f"lr_backbone:{lr_backbone}, lr_classifier:{lr_classifier}, epochs:{num_epochs}, alpha:{alpha}, beta:{beta}\n")
+        logger(f"lr_backbone:{lr_backbone}, lr_classifier:{lr_classifier}, epochs:{num_epochs}, alpha:{train_config.loss.alpha}, beta:{train_config.loss.beta}\n")
 
     # Load dataset
-    train_iter = load_data(config, mode=mode, split='train', csg_mode=csg_mode, batch_size=batch_size, num_workers=12, distributed=is_distributed)
+    train_iter = load_data(config, mode=train_config.dataset.mode, split='train', csg_mode=train_config.dataset.csg_mode, batch_size=batch_size, num_workers=12, distributed=is_distributed)
     val_iter = load_data(config, mode='origin', split='val', batch_size=batch_size, num_workers=4, distributed=False)
     
     # Create model
@@ -216,13 +163,10 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
         logger(f"Model moved to {device}\n")
 
     # Convert to SyncBN if distributed
-    if is_distributed and not bn_frozen:
+    if is_distributed and not train_config.train.bn_frozen:
         model = nn.SyncBatchNorm.convert_sync_batchnorm(model)
         if dist.get_rank() == 0:
             logger("Converted to SyncBatchNorm\n")
-
-    # Auxiliary Loss
-    model = AuxModelWrapper(model, aux_is_enabled)
 
     # DDP wrapper
     if is_distributed:
@@ -245,11 +189,17 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
     # Loss function
     criterion = nn.CrossEntropyLoss(ignore_index=255)
     
-    # SGD OPTIMIZER with different learning rates
-    optimizer = torch.optim.SGD([
-        {'params': backbone_params, 'lr': lr_backbone},
-        {'params': classifier_params, 'lr': lr_classifier}
-    ], momentum=momentum, weight_decay=weight_decay)
+    # OPTIMIZER with different learning rates (SGD or AdamW)
+    if train_config.optimizer.name == 'SGD':
+        optimizer = torch.optim.SGD([
+            {'params': backbone_params, 'lr': lr_backbone},
+            {'params': classifier_params, 'lr': lr_classifier}
+        ], momentum=train_config.optimizer.momentum, weight_decay=train_config.optimizer.weight_decay)
+    elif train_config.optimizer.name == 'AdamW':
+        optimizer = torch.optim.AdamW([
+            {'params': backbone_params, 'lr': lr_backbone},
+            {'params': classifier_params, 'lr': lr_classifier}
+        ], beta=train_config.optimizer.beta, weight_decay=train_config.optimizer.weight_decay)
 
 
     # AMP Scaler
@@ -269,10 +219,10 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
     ])
 
     # Create scheduler using warmup_iters only.
-    scheduler = WarmupScheduler(optimizer, base_scheduler, warmup_iters=warmup_iters, warmup_factor=warmup_factor, is_enabled = warmup_is_enabled)
+    scheduler = WarmupScheduler(optimizer, base_scheduler, warmup_iters=train_config.warmup.warmup_iters, warmup_factor=train_config.warmup.warmup_factor, is_enabled = train_config.warmup.warmup_is_enabled)
     
     # Save model path
-    model_path = f"/root/autodl-tmp/models/{date}{info}_A{alpha}B{beta}_.pth"
+    model_path = f"/root/autodl-tmp/models/{train_config.logging.date}{train_config.logging.info}_A{train_config.loss.alpha}B{train_config.loss.beta}_.pth"
 
     # Training loop
     origin_val_losses = []
@@ -298,8 +248,6 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
                     model_to_save = model
                     if hasattr(model_to_save, 'module'): # Unwrap DDP
                         model_to_save = model_to_save.module
-                    if hasattr(model_to_save, 'model'):  # Unwrap AuxModelWrapper
-                        model_to_save = model_to_save.model
                         
                     torch.save(model_to_save.state_dict(), model_path)
 
@@ -327,20 +275,17 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
 
 def main():
 
-    # Main loop
-    for (i, (lr_backbone, lr_classifier,batch_size)) in enumerate(grid_search_configs, start=1) :
+    # Create model
+    # Disabling pretrained weights to avoid network issues properly
+    get_model_function = models.get_model(train_config.model.name)
+    model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint = train_config.model.checkpoint_path).to(device) # modify to match your model
 
-        # Create model
-        # Disabling pretrained weights to avoid network issues properly
-        get_model_function = models.get_model(model_name)
-        model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint = model_checkpoint_path).to(device) # modify to match your model
+    train(model,device,train_config.train.num_epochs,train_config.train.batch_size,train_config.train.lr_backbone,train_config.train.lr_classifier,train_config.model.from_scratch,train_config.model.model_checkpoint_path)
 
-        train(model,device,num_epochs,batch_size,lr_backbone,lr_classifier,from_scratch,model_checkpoint_path)
-
-        del model 
-        gc.collect() 
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache() 
+    del model 
+    gc.collect() 
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache() 
 
 if __name__ == "__main__" :
     main()

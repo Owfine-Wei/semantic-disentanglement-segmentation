@@ -1,6 +1,7 @@
 import os
 import torch
 
+import argparse
 import models
 from configs import get_config
 from helpers.calculate_pa_miou import calculate_metrics
@@ -8,26 +9,25 @@ from helpers.calculate_saiou import cal_sa_iou
 from datasets.dataset_impl import load_data 
 
 
-# ======== Modified by User ========
-dataset_name = 'cityscapes'
-model_name = 'fcn'
-model_paths = [
-    '/mnt/d/SemanticSegmentation/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth'
-    ]
-# ==================================
+# Get arg
+parser = argparse.ArgumentParser(description='Model Validation on Origin and ForeBackground')
+parser.add_argument('--dataset_name', default='', help='the origin dataset name', required=True)
+parser.add_argument('--model_name', default='', help='Model type', required=True)
+parser.add_argument('--model_path', default='', help='Model checkpoint (.pth file)', required=True)
+arg = parser.parse_args()
 
 # Get config
-config = get_config(dataset_name)
+config = get_config(arg.dataset_name)
 
 # Test On Origin CityScapes
-def val(model_path):
+def val():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    get_model_function = models.get_model(model_name)
-    model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint=model_path)
+    get_model_function = models.get_model(arg.model_name)
+    model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint=arg.model_path)
 
 
-    print(os.path.basename(model_path))
+    print(os.path.basename(arg.model_path))
     # print('Testing model on Origin CityScapes')
     # print(f"Using device: {device}")
 
@@ -36,13 +36,11 @@ def val(model_path):
 
     val_iter = load_data(config, mode='origin', split='val')
 
-    miou, pa = calculate_metrics(model, val_iter, device, num_classes=config.NUM_CLASSES)
-    miou = miou.item()
-    pa = pa.item()
+    miou_dict, miou, pa = calculate_metrics(model, val_iter, device, num_classes=config.NUM_CLASSES)
 
     # print(f"Data miou: {miou:.5f}\nPixel Accuracy: {pa:.5f}")
 
-    return miou, pa
+    return miou_dict, miou, pa
 
 
 
@@ -52,11 +50,11 @@ FORE_NUM_CLASSES = len(config.FOREGROUND_TRAINIDS)
 BACK_NUM_CLASSES = len(config.BACKGROUND_TRAINIDS)
 
 
-def forebackground_val(model_path):
+def forebackground_val():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    get_model_function = models.get_model(model_name)
-    model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint=model_path)
+    get_model_function = models.get_model(arg.model_name)
+    model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint=arg.model_path)
 
     # print('Testing model on Foreground / Background CityScapes')
     # print(f"Using device: {device}")
@@ -77,39 +75,46 @@ def forebackground_val(model_path):
 
 if __name__ == "__main__" :
 
-    for i in range(len(model_paths)):
-        miou, pa = val(model_paths[i])
-        fiou_dict_id, fore_iou, biou_dict_id, back_iou, sa_iou = forebackground_val(model_paths[i])
+    miou_dict_id, miou, pa = val()
+    fiou_dict_id, fore_iou, biou_dict_id, back_iou, sa_iou = forebackground_val()
 
-        id_to_name = {v: k for k, v in config.TRAIN_ID_DICT.items()}
+    id_to_name = {v: k for k, v in config.TRAIN_ID_DICT.items()}
 
-        fiou_dict_name = {id_to_name[int(k)]: v for k, v in fiou_dict_id.items()}
-        biou_dict_name = {id_to_name[int(k)]: v for k, v in biou_dict_id.items()}
+    miou_dict_name = {id_to_name[int(k)]: v for k, v in miou_dict_id.items()}
+    fiou_dict_name = {id_to_name[int(k)]: v for k, v in fiou_dict_id.items()}
+    biou_dict_name = {id_to_name[int(k)]: v for k, v in biou_dict_id.items()}
 
-        print("\n" + "=" * 50)
+    print("\n" + "=" * 50)
 
-        print(f"{'Semantic Class':<20} | {'mIoU (%)':>10}")
-        print("-" * 33)
-        for name, score in fiou_dict_name.items():
-            print(f"{name:<20} | {score * 100:>10.2f}%")
+    print(f"{'Semantic Class':<20} | {'mIoU (%)':>10}")
+    print("-" * 33)
+    for name, score in fiou_dict_name.items():
+        print(f"{name:<20} | {score * 100:>10.2f}%")
 
-        print("=" * 50)
+    print("=" * 50)
 
-        print(f"{'Semantic Class':<20} | {'mIoU (%)':>10}")
-        print("-" * 33)
-        for name, score in biou_dict_name.items():
-            print(f"{name:<20} | {score * 100:>10.2f}%")
-        
-        print("=" * 50)
-        print(f"{'FINAL EVALUATION SUMMARY':^50}")
-        print("=" * 50)
-        print(f"{'Metric':<30} | {'Value':>15}")
-        print("-" * 50)
-        print(f"{'Origin mIoU':<30} | {miou:>15.5f}")
-        print(f"{'Origin Pixel Accuracy':<30} | {pa:>15.5f}")
-        print("-" * 50)
-        print(f"{'Foreground mIoU':<30} | {fore_iou:>15.5f}")
-        print(f"{'Background mIoU':<30} | {back_iou:>15.5f}")
-        print(f"{'SA mIoU':<30} | {sa_iou:>15.5f}")
-        print("=" * 50 + "\n")
+    print(f"{'Semantic Class':<20} | {'mIoU (%)':>10}")
+    print("-" * 33)
+    for name, score in biou_dict_name.items():
+        print(f"{name:<20} | {score * 100:>10.2f}%")
+    
+    print("=" * 50)
+
+    print(f"{'Semantic Class':<20} | {'mIoU (%)':>10}")
+    print("-" * 33)
+    for name, score in miou_dict_name.items():
+        print(f"{name:<20} | {score * 100:>10.2f}%")
+
+    print("=" * 50)
+    print(f"{'FINAL EVALUATION SUMMARY':^50}")
+    print("=" * 50)
+    print(f"{'Metric':<30} | {'Value':>15}")
+    print("-" * 50)
+    print(f"{'Origin mIoU':<30} | {miou:>15.5f}")
+    print(f"{'Origin Pixel Accuracy':<30} | {pa:>15.5f}")
+    print("-" * 50)
+    print(f"{'Foreground mIoU':<30} | {fore_iou:>15.5f}")
+    print(f"{'Background mIoU':<30} | {back_iou:>15.5f}")
+    print(f"{'SA mIoU':<30} | {sa_iou:>15.5f}")
+    print("=" * 50 + "\n")
 

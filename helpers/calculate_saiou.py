@@ -9,99 +9,74 @@ import torch
 import torch.nn.functional as F
 
 
-import torch
-import torch.nn.functional as F
-
 def cal_fore_back_iou(model, val_loader, train_ids, device):
     """
-    Compute average IoU over images for a set of class ids.
+    计算给定类别集合的 Dataset-level 平均 IoU (对齐学术标准)。
     
-    Args:
-        model: The segmentation model.
-        val_loader: DataLoader returning (images, labels, masks, ...).
-        train_ids: List of integer class IDs to calculate IoU for.
-        device: Torch device (cpu or cuda).
-        
-    Returns:
-        iou_dict (dict): A dictionary {class_id: mean_iou}.
-        mean_iou (float): The average of the mean_ious across all requested classes.
+    逻辑：累加所有样本的交集和并集像素总和，最后统一求商。
     """
-    
     model.eval()
     
-    # 1. 在循环外部初始化累加器，用于记录所有图片的总 IoU
-    # key为str(tid)是为了方便后续处理，也可以直接用int
-    total_iou_dict = {str(tid): 0.0 for tid in train_ids}
+    # K 是要计算的类别数量
+    num_target_classes = len(train_ids)
+    # 将 train_ids 转为 tensor (1, K, 1)，用于并行广播比较
+    target_ids_tensor = torch.tensor(train_ids, device=device, dtype=torch.long).view(1, -1, 1)
     
-    total_images = 0 # 记录总图片数量
+    # 初始化全局累加器：存储每个类在整个数据集上的交集和并集总数
+    total_inter_accumulator = torch.zeros(num_target_classes, device=device)
+    total_union_accumulator = torch.zeros(num_target_classes, device=device)
 
     with torch.no_grad():
-        for images, labels, masks, _, _ in val_loader:
-            images = images.to(device)
-            labels = labels.to(device, dtype=torch.long)
-            # 假设 mask 中 0 为有效区域，1 为无效区域
-            masks = masks.to(device, dtype=torch.long)
+        for batch in val_loader:
+            # 兼容性解包，假设 masks 在第三个位置
+            images, labels, masks = batch[0].to(device), batch[1].to(device), batch[2].to(device)
 
-            batch_size = images.size(0)
-            
-            # 模型推理
             outputs = model(images)
+            if isinstance(outputs, (tuple, list)):
+                outputs = outputs[0]
 
-            # 对齐尺寸：如果输出尺寸和标签不一致，进行插值
+            # 尺寸对齐
             if outputs.shape[-2:] != labels.shape[-2:]:
                 outputs = F.interpolate(
                     outputs, size=labels.shape[-2:], mode='bilinear', align_corners=False
                 )
 
-            # 获取预测结果 (B, H, W)
             preds = torch.argmax(outputs, dim=1)
 
-            # 生成有效掩码 (B, H, W)，根据逻辑描述：只有 masks=0 的地方才有效
-            # 这里的 valid_area 对应 user 逻辑中的 (1 - masks)
-            valid_area = (masks == 0)
+            # --- 向量化处理 ---
+            # 展平像素维度 (B, H, W) -> (B, N)
+            flat_labels = labels.view(labels.size(0), -1)
+            flat_preds = preds.view(preds.size(0), -1)
+            # mask=0 为有效，1 为忽略；unsqueeze 方便广播
+            valid_mask = (masks.view(masks.size(0), -1) == 0).unsqueeze(1) # (B, 1, N)
 
-            for tid in train_ids:
-                # 2. 找到 Labels 中为 tid 且在有效区域的像素
-                # eq(tid) 等价于 == tid
-                tid_in_labels = labels.eq(tid) & valid_area
-                
-                # 3. 找到 Preds 中为 tid 且在有效区域的像素
-                tid_in_preds = preds.eq(tid) & valid_area
+            # --- 广播机制计算交集与并集 ---
+            # label_in_train: (B, K, N) - 第b张图中，第n个像素是否属于第k个类且有效
+            label_in_train = (flat_labels.unsqueeze(1) == target_ids_tensor) & valid_mask
+            pred_in_train = (flat_preds.unsqueeze(1) == target_ids_tensor) & valid_mask
 
-                # 4. 计算交集和并集
-                intersection = tid_in_labels & tid_in_preds
-                union = tid_in_labels | tid_in_preds
+            # 计算当前 batch 的交集和并集像素总数
+            # 对 Batch(0) 和 Pixel(2) 维度求和，得到 (K,)
+            batch_inter = (label_in_train & pred_in_train).float().sum(dim=(0, 2))
+            batch_union = (label_in_train | pred_in_train).float().sum(dim=(0, 2))
 
-                # 5. 计算当前 Batch 中每张图片的 IoU
-                # sum(dim=(1, 2)) 将 (B, H, W) 压缩为 (B, )，即算出每张图的像素数
-                # float() 转换是为了进行除法运算
-                inter_sum = intersection.float().sum(dim=(1, 2))
-                union_sum = union.float().sum(dim=(1, 2))
-                
-                # 计算 IoU: Intersection / Union
-                # 添加 1e-6 是为了防止 Union 为 0 时产生除零错误 (NaN)
-                ious = inter_sum / (union_sum + 1e-6)
+            # --- 累加到全局累加器 ---
+            total_inter_accumulator += batch_inter
+            total_union_accumulator += batch_union
 
-                # 6. 将当前 Batch 的 IoU 求和并累加到字典中
-                total_iou_dict[str(tid)] += ious.sum().item()
-            
-            # 更新处理过的图片总数
-            total_images += batch_size
-
-    # 7. 计算最终结果
-    # 此时 total_iou_dict 中存储的是所有图片 IoU 的总和，需要除以图片总数得到平均值
-    final_iou_dict = {}
-    average_iou_sum = 0.0
+    # --- 计算最终结果 ---
+    # 计算每个类别的全局 IoU: (K,)
+    # 使用 1e-8 防止全集中无该类时产生的除零错误
+    avg_ious = total_inter_accumulator / (total_union_accumulator + 1e-8)
     
-    for tid in train_ids:
-        tid_str = str(tid)
-        # 计算该类别的 Mean IoU
-        mIoU = total_iou_dict[tid_str] / total_images
-        final_iou_dict[tid_str] = mIoU
-        average_iou_sum += mIoU
+    # 转为字典输出
+    final_iou_dict = {
+        str(tid): avg_ious[i].item() 
+        for i, tid in enumerate(train_ids)
+    }
 
     # 计算所有选中类别的平均 mIoU
-    final_avg_iou = average_iou_sum / len(train_ids) if len(train_ids) > 0 else 0.0
+    final_avg_iou = avg_ious.mean().item() if num_target_classes > 0 else 0.0
 
     return final_iou_dict, final_avg_iou
 

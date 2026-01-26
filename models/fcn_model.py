@@ -40,11 +40,8 @@ def get_model(num_classes, checkpoint=None):
 
     # Update number of classes to match your specific dataset
     cfg.model.decode_head.num_classes = num_classes
-    
-    # Update auxiliary head if it exists (standard FCN-D8 usually has one)
-    if hasattr(cfg.model, 'auxiliary_head') and cfg.model.auxiliary_head is not None:
-        cfg.model.auxiliary_head.num_classes = num_classes
 
+    # Without auxiliary head
     cfg.model.auxiliary_head = None
 
     # 3. Build the model and load weights

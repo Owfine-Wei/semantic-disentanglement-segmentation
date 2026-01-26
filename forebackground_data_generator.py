@@ -7,16 +7,17 @@ its label to the ignore index. It also writes binary masks used by the
 dataset creation.
 """
 
+import argparse
 import os
 import cv2
 import numpy as np
 from configs import get_config
 
-# ========== Modified by User ==========
-dataset_name = 'cityscapes'
-# ======================================
+parser = argparse.ArgumentParser(description='Create Foreground/Background Datasets')
+parser.add_argument('--dataset_name', default='', help='the origin dataset name', required=True)
+arg = parser.parse_args()
 
-config = get_config(dataset_name)
+config = get_config(arg.dataset_name)
 
 def create_foreback_data():
     """
@@ -25,6 +26,20 @@ def create_foreback_data():
     The function expects Cityscapes layout under `config.DATA_DIR` and writes
     outputs to directories defined in `config`, so users need to check on `config.py` before using this script.
     """
+
+    # Make directories
+    directories = [
+        config.BACK_IMGS_DIR,
+        config.FORE_IMGS_DIR,
+        config.BACK_LABELS_DIR,
+        config.FORE_LABELS_DIR,
+        config.BACK_MASK_DIR,
+        config.FORE_MASK_DIR
+    ]
+    for directory in directories:
+        if directory: 
+            os.makedirs(directory, exist_ok=True)
+            
 
     print(f"Data Root: {config.DATA_DIR}\n")
     print(f"Background Output (Images only containing Background): {config.BACK_IMGS_DIR}\n")
@@ -93,7 +108,7 @@ def create_foreback_data():
 
                 # --- Foreground Set ---
                 # mask where pixels belong to background classes
-                is_bg = np.isin(label, [config.BACKGROUND_TRAINIDS, 255])
+                is_bg = np.isin(label, config.BACKGROUND_TRAINIDS+[255])
                 img_fg_only = img.copy()
                 img_fg_only[is_bg] = mean_bgr
 
@@ -107,12 +122,12 @@ def create_foreback_data():
                 cv2.imwrite(os.path.join(fg_label_out_city_dir, fg_label_name), label_fg_only)
 
                 # save background mask used when creating foreground set
-                bg_mask_name = file_name.replace('.png', '_fg_mask.png')
-                cv2.imwrite(os.path.join(bg_mask_out_city_dir, bg_mask_name), is_bg.astype(np.uint8) * 255)
+                fg_mask_name = file_name.replace('.png', '_fg_mask.png')
+                cv2.imwrite(os.path.join(fg_mask_out_city_dir, fg_mask_name), is_bg.astype(np.uint8) * 255)
 
                 # --- Background Set ---
                 # mask where pixels belong to foreground classes
-                is_fg = np.isin(label, [config.FOREGROUND_TRAINIDS, 255])
+                is_fg = np.isin(label, config.FOREGROUND_TRAINIDS+[255])
                 img_bg_only = img.copy()
                 img_bg_only[is_fg] = mean_bgr
 
@@ -126,8 +141,8 @@ def create_foreback_data():
                 cv2.imwrite(os.path.join(bg_label_out_city_dir, bg_label_name), label_bg_only)
 
                 # save foreground mask used when creating background set
-                fg_mask_name = file_name.replace('.png', '_bg_mask.png')
-                cv2.imwrite(os.path.join(fg_mask_out_city_dir, fg_mask_name), is_fg.astype(np.uint8) * 255)
+                bg_mask_name = file_name.replace('.png', '_bg_mask.png')
+                cv2.imwrite(os.path.join(bg_mask_out_city_dir, bg_mask_name), is_fg.astype(np.uint8) * 255)
 
     print("All processing done!")
 

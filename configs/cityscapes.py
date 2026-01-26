@@ -49,17 +49,17 @@ class CityScapesConfig:
         'origin': {
             'imgs': DATA_DIR + 'leftImg8bit/',
             'labels': DATA_DIR + 'gtFine/',
-            'mask': ''
+            'masks': ''
         },
         'foreground': {
             'imgs': FORE_IMGS_DIR,
             'labels': FORE_LABELS_DIR,
-            'mask': FORE_MASK_DIR
+            'masks': FORE_MASK_DIR
         },
         'background': {
             'imgs': BACK_IMGS_DIR,
             'labels': BACK_LABELS_DIR,
-            'mask': BACK_MASK_DIR
+            'masks': BACK_MASK_DIR
         },
         'csg': {
             'imgs': DATA_DIR + 'leftImg8bit/',

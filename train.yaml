@@ -1,0 +1,43 @@
+# 数据集配置
+dataset:
+  name: 'cityscapes'
+  mode: 'csg'        # origin / foreground / background / csg / nda
+  csg_mode: 'both'   # foreground / background / both
+
+# 模型配置
+model:
+  name: 'fcn'
+  from_scratch: false
+  checkpoint_path: '/root/autodl-tmp/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth'
+
+# 训练超参数
+train:
+  num_epochs: 2
+  batch_size: 4
+  lr_backbone: 1.0e-06
+  lr_classifier: 1.0e-05
+  bn_frozen: false
+
+# 损失函数权重
+loss:
+  alpha: 1.0
+  beta: 1.0
+
+# 优化器
+optimizer:
+  name: "AdamW"
+  beta: (0.9, 0.999)
+  weight_decay: 0.0001
+  momentum: 0.9
+
+# 学习率预热
+warmup:
+  enabled: true
+  iters: 1000
+  factor: 0.01
+
+# 日志与输出
+logging:
+  date: "_1_24_2026"
+  info: "_ONLYFORTEST_"
+  root: "/root/autodl-tmp/log/"
