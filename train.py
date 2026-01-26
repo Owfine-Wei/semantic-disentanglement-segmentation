@@ -1,11 +1,24 @@
-from helpers.set_seed import setup_seed
-setup_seed(42, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
-
-import os
-import gc
 import yaml
 import argparse
 from easydict import EasyDict as edict
+
+parser = argparse.ArgumentParser(description='Train')
+parser.add_argument('--train_config_path', default='', help='.yaml file for training', required=True)
+arg = parser.parse_args()
+
+def load_train_config(config_path):
+    with open(config_path, 'r', encoding='utf-8') as f:
+        train_config = yaml.safe_load(f)
+        train_config = edict(train_config)
+    return train_config
+
+train_config = load_train_config(arg.train_config_path)
+
+from helpers.set_seed import setup_seed
+setup_seed(train_config.seed, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
+
+import os
+import gc
 
 import torch
 from torch import nn
@@ -25,17 +38,6 @@ os.environ['TRANSFORMERS_OFFLINE'] = '1'
 os.environ['HF_DATASETS_OFFLINE'] = '1'
 os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
 
-parser = argparse.ArgumentParser(description='Train')
-parser.add_argument('--train_config_path', default='', help='.yaml file for training', required=True)
-arg = parser.parse_args()
-
-def load_train_config(config_path):
-    with open(config_path, 'r', encoding='utf-8') as f:
-        train_config = yaml.safe_load(f)
-        train_config = edict(train_config)
-    return train_config
-
-train_config = load_train_config(arg.train_config_path)
 
 # config
 config = get_config(train_config.dataset.name)
