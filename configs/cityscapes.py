@@ -20,12 +20,10 @@ class CityScapesConfig:
     TRAIN_LABEL_DIR = '/home/tzuheng/sds_project/data/CityScapes/gtFine/train'
     VAL_IMG_DIR = '/home/tzuheng/sds_project/data/CityScapes/leftImg8bit/val'
     VAL_LABEL_DIR = '/home/tzuheng/sds_project/data/CityScapes/gtFine/val'
-    TEST_IMG_DIR = '/home/tzuheng/sds_project/data/CityScapes/leftImg8bit/test'
-    TEST_LABEL_DIR = '/home/tzuheng/sds_project/data/CityScapes/gtFine/test'
-
+    
     IMG_SUFFIX = '_leftImg8bit.png'
     LABEL_SUFFIX = '_gtFine_labelTrainIds.png'
-    DATA_SPLIT = ['train', 'val', 'test']
+    DATA_SPLIT = ['train', 'val']
 
     # Foreground/Background Visualization Results
     FORE_VISUAL_DIR = '/root/autodl-tmp/data/Result/Fore_Test_Result/'
@@ -39,13 +37,11 @@ class CityScapesConfig:
     MODEL_ROOT = '/root/autodl-tmp/models/'
 
     # Dictionary
-    IMG_DIR = {'train':TRAIN_IMG_DIR,
-               'val': VAL_IMG_DIR,
-               'test': TEST_IMG_DIR}
+    IMG_DIR = {DATA_SPLIT[0]:TRAIN_IMG_DIR,
+               DATA_SPLIT[1]: VAL_IMG_DIR}
     
-    LABEL_DIR = {'train':TRAIN_LABEL_DIR,
-               'val': VAL_LABEL_DIR,
-               'test': TEST_LABEL_DIR}
+    LABEL_DIR = {DATA_SPLIT[0]:TRAIN_LABEL_DIR,
+               DATA_SPLIT[1]: VAL_LABEL_DIR}
 
     # ==============================================================================
     # DATA PROCESSING
