@@ -7,6 +7,7 @@ and the weighted SA-IoU (stand-alone IoU) combining them.
 
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
 
 def cal_fore_back_iou(model, val_loader, train_ids, device):
@@ -27,7 +28,7 @@ def cal_fore_back_iou(model, val_loader, train_ids, device):
     total_union_accumulator = torch.zeros(num_target_classes, device=device)
 
     with torch.no_grad():
-        for batch in val_loader:
+        for batch in tqdm(val_loader):
             # 兼容性解包，假设 masks 在第三个位置
             images, labels, masks = batch[0].to(device), batch[1].to(device), batch[2].to(device)
 
@@ -88,8 +89,8 @@ def cal_sa_iou(model, fore_loader, back_loader, fore_ids, back_ids, device):
     IoUs, weighted by the number of classes in each group.
     """
 
-    fiou_dict, fore_iou = cal_fore_back_iou(model, fore_loader, fore_ids, device)
-    biou_dict, back_iou = cal_fore_back_iou(model, back_loader, back_ids, device)
+    fiou_dict, fore_iou = cal_fore_back_iou(model, back_loader, fore_ids, device)
+    biou_dict, back_iou = cal_fore_back_iou(model, fore_loader, back_ids, device)
 
     fore_classes = len(fore_ids)
     back_classes = len(back_ids)
@@ -98,4 +99,8 @@ def cal_sa_iou(model, fore_loader, back_loader, fore_ids, back_ids, device):
     sa_iou = (fore_classes / data_classes) * fore_iou + (back_classes / data_classes) * back_iou
 
     return fiou_dict, fore_iou, biou_dict, back_iou, sa_iou
+
+    
+
+
 

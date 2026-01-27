@@ -47,7 +47,7 @@ class Origin_Dataset(Dataset):
         img_suffix = getattr(config, 'IMG_SUFFIX', '_leftImg8bit.png')
         label_suffix = getattr(config, 'LABEL_SUFFIX', '_gtFine_labelTrainIds.png')
 
-        print(f"[{split}] Scanning images in {self.img_root}...")
+        # print(f"[{split}] Scanning images in {self.img_root}...")
         
         # 3. 遍历图片目录，动态寻找对应的标签
         for root, _, filenames in os.walk(self.img_root):
@@ -73,7 +73,7 @@ class Origin_Dataset(Dataset):
                     else:
                         print(f"Warning: Label not found for {filename}, skipping.")
 
-        print(f"Found {len(self.files)} paired samples for {split}.")
+        # print(f"Found {len(self.files)} paired samples for {split}.")
         
         if len(self.files) == 0:
             raise RuntimeError(f"No valid pairs found! Check your IMG_SUFFIX '{img_suffix}' or paths.")
@@ -251,11 +251,11 @@ class SDS_Dataset(Dataset):
         if mode == 'origin':
             self.dataset = Origin_Dataset(config, split)
         elif mode == 'foreground':
-            self.dataset = FOREBACK_Dataset(config, 'foreground', split)
+            self.dataset = FOREBACK_Dataset(config, split, 'foreground')
         elif mode == 'background':
-            self.dataset = FOREBACK_Dataset(config, 'background', split)
+            self.dataset = FOREBACK_Dataset(config, split, 'background')
         elif mode == 'csg':
-            self.dataset = CSG_Dataset(config, csg_mode, split )
+            self.dataset = CSG_Dataset(config, split, csg_mode )
         elif mode == 'nda':
             self.dataset = NDA_Dataset(config, split)
         else:

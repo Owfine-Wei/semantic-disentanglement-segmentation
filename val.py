@@ -43,6 +43,7 @@ def val():
     return miou_dict, miou, pa
 
 
+
 # Test on Foreground / Background CityScapes
 
 FORE_NUM_CLASSES = len(config.FOREGROUND_TRAINIDS)

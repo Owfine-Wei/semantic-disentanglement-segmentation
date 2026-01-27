@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from tqdm import tqdm
 
 def calculate_metrics(model, val_loader, device, num_classes, train_id_dict=None):
     """
@@ -23,7 +24,7 @@ def calculate_metrics(model, val_loader, device, num_classes, train_id_dict=None
     target_ids_tensor = torch.tensor(range(num_classes), device=device).view(1, -1, 1)
 
     with torch.no_grad():
-        for batch in val_loader:
+        for batch in tqdm(val_loader):
             images, labels = batch[0].to(device), batch[1].to(device, dtype=torch.long)
             
             outputs = model(images)
