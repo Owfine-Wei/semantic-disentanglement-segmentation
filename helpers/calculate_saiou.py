@@ -99,7 +99,3 @@ def cal_sa_iou(model, fore_loader, back_loader, fore_ids, back_ids, device):
 
     return fiou_dict, fore_iou, biou_dict, back_iou, sa_iou
 
-    
-
-
-

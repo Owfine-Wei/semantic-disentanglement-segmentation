@@ -15,22 +15,17 @@ class CityScapesConfig:
     # ==============================================================================
 
     # Cityscapes Data Root
-    DATA_DIR = '/root/autodl-tmp/data/Cityscapes/'
+    DATA_DIR = '/home/tzuheng/sds_project/data/CityScapes/'
+    TRAIN_IMG_DIR = '/home/tzuheng/sds_project/data/CityScapes/leftImg8bit/train'
+    TRAIN_LABEL_DIR = '/home/tzuheng/sds_project/data/CityScapes/gtFine/train'
+    VAL_IMG_DIR = '/home/tzuheng/sds_project/data/CityScapes/leftImg8bit/val'
+    VAL_LABEL_DIR = '/home/tzuheng/sds_project/data/CityScapes/gtFine/val'
+    TEST_IMG_DIR = '/home/tzuheng/sds_project/data/CityScapes/leftImg8bit/test'
+    TEST_LABEL_DIR = '/home/tzuheng/sds_project/data/CityScapes/gtFine/test'
 
-    # Foreground/Background Data Root
-    FOREBACK_DATA_DIR = '/root/autodl-tmp/data/ForeBackground/'
-
-    # Foreground/Background Images
-    FORE_IMGS_DIR = '/root/autodl-tmp/data/ForeBackground/leftImg8bit_fg/'
-    BACK_IMGS_DIR = '/root/autodl-tmp/data/ForeBackground/leftImg8bit_bg/'
-
-    # Foreground/Background Labels
-    FORE_LABELS_DIR = '/root/autodl-tmp/data/ForeBackground/gtFine_fg/'
-    BACK_LABELS_DIR = '/root/autodl-tmp/data/ForeBackground/gtFine_bg/'
-
-    # Foreground/Background Masks
-    FORE_MASK_DIR = '/root/autodl-tmp/data/ForeBackground/mask_fg/'
-    BACK_MASK_DIR = '/root/autodl-tmp/data/ForeBackground/mask_bg/'
+    IMG_SUFFIX = '_leftImg8bit.png'
+    LABEL_SUFFIX = '_gtFine_labelTrainIds.png'
+    DATA_SPLIT = ['train', 'val', 'test']
 
     # Foreground/Background Visualization Results
     FORE_VISUAL_DIR = '/root/autodl-tmp/data/Result/Fore_Test_Result/'
@@ -43,29 +38,14 @@ class CityScapesConfig:
     # MODEL (Where your model saved)
     MODEL_ROOT = '/root/autodl-tmp/models/'
 
-
-    # Data Dictionary
-    DIRS = {
-        'origin': {
-            'imgs': DATA_DIR + 'leftImg8bit/',
-            'labels': DATA_DIR + 'gtFine/',
-            'masks': ''
-        },
-        'foreground': {
-            'imgs': FORE_IMGS_DIR,
-            'labels': FORE_LABELS_DIR,
-            'masks': FORE_MASK_DIR
-        },
-        'background': {
-            'imgs': BACK_IMGS_DIR,
-            'labels': BACK_LABELS_DIR,
-            'masks': BACK_MASK_DIR
-        },
-        'csg': {
-            'imgs': DATA_DIR + 'leftImg8bit/',
-            'labels': DATA_DIR + 'gtFine/'
-        }
-    }
+    # Dictionary
+    IMG_DIR = {'train':TRAIN_IMG_DIR,
+               'val': VAL_IMG_DIR,
+               'test': TEST_IMG_DIR}
+    
+    LABEL_DIR = {'train':TRAIN_LABEL_DIR,
+               'val': VAL_LABEL_DIR,
+               'test': TEST_LABEL_DIR}
 
     # ==============================================================================
     # DATA PROCESSING
