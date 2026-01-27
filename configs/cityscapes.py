@@ -15,26 +15,26 @@ class CityScapesConfig:
     # ==============================================================================
 
     # Cityscapes Data Root
-    DATA_DIR = '/home/tzuheng/sds_project/data/CityScapes/'
-    TRAIN_IMG_DIR = '/home/tzuheng/sds_project/data/CityScapes/leftImg8bit/train'
-    TRAIN_LABEL_DIR = '/home/tzuheng/sds_project/data/CityScapes/gtFine/train'
-    VAL_IMG_DIR = '/home/tzuheng/sds_project/data/CityScapes/leftImg8bit/val'
-    VAL_LABEL_DIR = '/home/tzuheng/sds_project/data/CityScapes/gtFine/val'
+    DATA_DIR = '../data/CityScapes/'
+    TRAIN_IMG_DIR = '../data/CityScapes/leftImg8bit/train'
+    TRAIN_LABEL_DIR = '../data/CityScapes/gtFine/train'
+    VAL_IMG_DIR = '../data/CityScapes/leftImg8bit/val'
+    VAL_LABEL_DIR = '../data/CityScapes/gtFine/val'
     
     IMG_SUFFIX = '_leftImg8bit.png'
     LABEL_SUFFIX = '_gtFine_labelTrainIds.png'
     DATA_SPLIT = ['train', 'val']
 
     # Foreground/Background Visualization Results
-    FORE_VISUAL_DIR = '/root/autodl-tmp/data/Result/Fore_Test_Result/'
-    BACK_VISUAL_DIR = '/root/autodl-tmp/data/Result/Back_Test_Result/'
+    FORE_VISUAL_DIR = '../data/Result/Fore_Test_Result/'
+    BACK_VISUAL_DIR = '../data/Result/Back_Test_Result/'
 
     # Cityscapes Visualization Results
-    VAL_IMGS_DIR = '/root/autodl-tmp/data/Cityscapes/leftImg8bit/val/'
-    VISUAL_IMGS_DIR = '/root/autodl-tmp/data/Cityscapes/leftImgs8bit/val/'
+    VAL_IMGS_DIR = '../data/Cityscapes/leftImg8bit/val/'
+    VISUAL_IMGS_DIR = '../data/Cityscapes/leftImgs8bit/val/'
 
     # MODEL (Where your model saved)
-    MODEL_ROOT = '/root/autodl-tmp/models/'
+    MODEL_ROOT = '../models/'
 
     # Dictionary
     IMG_DIR = {DATA_SPLIT[0]:TRAIN_IMG_DIR,
@@ -42,6 +42,18 @@ class CityScapesConfig:
     
     LABEL_DIR = {DATA_SPLIT[0]:TRAIN_LABEL_DIR,
                DATA_SPLIT[1]: VAL_LABEL_DIR}
+    
+    # Foreground/Background Images
+    FORE_IMGS_DIR = '../data/ForeBackground/leftImg8bit_fg/'
+    BACK_IMGS_DIR = '../data/ForeBackground/leftImg8bit_bg/'
+
+    # Foreground/Background Labels
+    FORE_LABELS_DIR = '../data/ForeBackground/gtFine_fg/'
+    BACK_LABELS_DIR = '../data/ForeBackground/gtFine_bg/'
+
+    # Foreground/Background Masks
+    FORE_MASK_DIR = '../data/ForeBackground/mask_fg/'
+    BACK_MASK_DIR = '../data/ForeBackground/mask_bg/'
 
     # ==============================================================================
     # DATA PROCESSING
