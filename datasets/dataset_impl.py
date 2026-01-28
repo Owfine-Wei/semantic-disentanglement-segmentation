@@ -44,34 +44,43 @@ class Origin_Dataset(Dataset):
 
         # 2. 从 Config 获取后缀 (这是解耦的关键)
         # 如果 config 没有定义，给默认值 (兼容 Cityscapes)
-        img_suffix = getattr(config, 'IMG_SUFFIX', '_leftImg8bit.png')
-        label_suffix = getattr(config, 'LABEL_SUFFIX', '_gtFine_labelTrainIds.png')
+        img_suffix = config.IMG_SUFFIX
+        label_suffix = config.LABEL_SUFFIX
 
         # print(f"[{split}] Scanning images in {self.img_root}...")
         
         # 3. 遍历图片目录，动态寻找对应的标签
         for root, _, filenames in os.walk(self.img_root):
             for filename in filenames:
-                if filename.endswith(img_suffix):
-                    # 获取图片绝对路径
-                    img_path = os.path.join(root, filename)
-                    
-                    # --- 核心逻辑：推导标签路径 ---
-                    
-                    # 1. 计算相对路径 (例如: 'frankfurt/file.png' 或 'file.png')
-                    rel_path = os.path.relpath(root, self.img_root)
-                    
-                    # 2. 替换文件名后缀 (从 img_suffix -> label_suffix)
-                    label_filename = filename.replace(img_suffix, label_suffix)
-                    
-                    # 3. 拼接标签完整路径 (保持相同的目录结构)
-                    label_path = os.path.join(self.label_root, rel_path, label_filename)
 
-                    # 4. 强校验：标签文件必须存在
-                    if os.path.exists(label_path):
-                        self.files.append((img_path, label_path))
-                    else:
-                        print(f"Warning: Label not found for {filename}, skipping.")
+                # 找到当前 filename 匹配的具体 suffix
+                matched_suffix = (
+                    next((s for s in img_suffix if filename.endswith(s)), None)
+                    if isinstance(img_suffix, tuple)
+                    else img_suffix if filename.endswith(img_suffix)
+                    else None
+                )
+
+                if matched_suffix is None:
+                    continue
+
+                # 图片路径
+                img_path = os.path.join(root, filename)
+
+                # 相对路径
+                rel_path = os.path.relpath(root, self.img_root)
+
+                # 推导 label 文件名
+                label_filename = filename.replace(matched_suffix, label_suffix)
+
+                # 拼 label 路径
+                label_path = os.path.join(self.label_root, rel_path, label_filename)
+
+                # 校验
+                if os.path.exists(label_path):
+                    self.files.append((img_path, label_path))
+                else:
+                    print(f"Warning: Label not found for {filename}, skipping.")
 
         # print(f"Found {len(self.files)} paired samples for {split}.")
         
@@ -82,16 +91,25 @@ class Origin_Dataset(Dataset):
         return len(self.files)
 
     def __getitem__(self, idx):
-        # 从元组中解包路径，保证绝对一一对应
         img_path, label_path = self.files[idx]
 
-        # 读取图片
+        # 读取图片（先不转 numpy，PIL 的 .size 效率很高）
         image_pil = Image.open(img_path).convert('RGB')
+        
+        if image_pil.size != (self.config.IMG_SIZE[-1], self.config.IMG_SIZE[-2]): 
+            # 方案 A: 递归取下一张（简单暴力）
+            new_idx = (idx + 1) % len(self.files)
+            return self.__getitem__(new_idx)
+            
         label_pil = Image.open(label_path)
+        if label_pil.size != (self.config.IMG_SIZE[-1], self.config.IMG_SIZE[-2]):
+            new_idx = (idx + 1) % len(self.files)
+            return self.__getitem__(new_idx)
 
+        # 校验通过后再进行转换
         image = np.array(image_pil)
         label = np.array(label_pil)
-
+        
         # 转 Tensor
         image = torch.from_numpy(image).permute(2, 0, 1).float() / 255.0
         label = torch.from_numpy(label).long()
@@ -131,10 +149,20 @@ class FOREBACK_Dataset(Origin_Dataset):
         # 解包三元组，保证绝对一一对应
         img_path, label_path = self.files[idx]
 
-        # 读取文件
+        # 读取图片（先不转 numpy，PIL 的 .size 效率很高）
         image_pil = Image.open(img_path).convert('RGB')
-        label_pil = Image.open(label_path)
         
+        if image_pil.size != (self.config.IMG_SIZE[-1], self.config.IMG_SIZE[-2]): 
+            # 方案 A: 递归取下一张（简单暴力）
+            new_idx = (idx + 1) % len(self.files)
+            return self.__getitem__(new_idx)
+            
+        label_pil = Image.open(label_path)
+        if label_pil.size != (self.config.IMG_SIZE[-1], self.config.IMG_SIZE[-2]):
+            new_idx = (idx + 1) % len(self.files)
+            return self.__getitem__(new_idx)
+
+        # 校验通过后再进行转换
         image = np.array(image_pil)
         label = np.array(label_pil)
 
@@ -181,10 +209,20 @@ class CSG_Dataset(Origin_Dataset):
         # 解包路径
         img_path, label_path = self.files[idx]
 
-        # 读取原始数据
+        # 读取图片（先不转 numpy，PIL 的 .size 效率很高）
         origin_image_pil = Image.open(img_path).convert('RGB')
+        
+        if origin_image_pil.size != (self.config.IMG_SIZE[-1], self.config.IMG_SIZE[-2]): 
+            # 方案 A: 递归取下一张（简单暴力）
+            new_idx = (idx + 1) % len(self.files)
+            return self.__getitem__(new_idx)
+            
         origin_label_pil = Image.open(label_path)
+        if origin_label_pil.size != (self.config.IMG_SIZE[-1], self.config.IMG_SIZE[-2]):
+            new_idx = (idx + 1) % len(self.files)
+            return self.__getitem__(new_idx)
 
+        # 校验通过后再进行转换
         origin_image_np = np.array(origin_image_pil)
         origin_label_np = np.array(origin_label_pil)
 

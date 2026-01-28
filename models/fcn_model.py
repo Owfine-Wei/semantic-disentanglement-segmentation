@@ -28,7 +28,7 @@ def get_model(num_classes, checkpoint=None):
 
     # 1. Path to the official config file within your source code
     # Adjust this path if your mmsegmentation folder is located elsewhere
-    mmseg_root = '/root/autodl-tmp/mmsegmentation/'
+    mmseg_root = '../mmsegmentation'
     config_path = os.path.join(mmseg_root, 'configs/fcn/fcn_r50-d8_4xb2-40k_cityscapes-512x1024.py')
     
     if not os.path.exists(config_path):

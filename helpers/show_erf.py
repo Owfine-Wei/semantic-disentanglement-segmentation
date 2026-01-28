@@ -21,16 +21,16 @@ import os
 
 dataset_name = 'cityscapes'
 
-model_name = 'SegFormer'
+model_name = 'segformer'
 
-IMG_DIR = "/root/autodl-tmp/data/Cityscapes/leftImg8bit/val"
-LABEL_DIR = "/root/autodl-tmp/data/Cityscapes/gtFine/val"
+IMG_DIR = "../data/Cityscapes/leftImg8bit/val"
+LABEL_DIR = "../data/Cityscapes/gtFine/val"
 
 semantic = 'car'
 
-out_dir = "/root/autodl-tmp/outputs/val_erf"
+out_dir = "../outputs/segformer_erf"
 
-checkpoint_path = "/root/autodl-tmp/models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth"
+checkpoint_path = "../models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth"
 
 IS_CROP = True 
 CROP_SIZE = (1024,1024)

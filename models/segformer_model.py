@@ -27,7 +27,7 @@ def get_model(num_classes, checkpoint=None):
 
     # 1. Path to the config file
     # Updated to point to the SegFormer-B3 configuration
-    mmseg_root = '/root/autodl-tmp/mmsegmentation/'
+    mmseg_root = '../mmsegmentation/'
     config_path = os.path.join(mmseg_root, 'configs/segformer/segformer_mit-b3_8xb1-160k_cityscapes-1024x1024.py')
     
     if not os.path.exists(config_path):
