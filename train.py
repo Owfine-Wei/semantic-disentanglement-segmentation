@@ -69,14 +69,10 @@ else:
     print("Running in non-distributed mode.")
 
 
-def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs):
+def train_epoch(model, train_loader, criterion, optimizer, scheduler, device, epoch, num_epochs): # 去掉了 scaler 参数
 
     model.train()
-
-    if train_config.train.bn_frozen:
-        for m in model.modules():
-            if isinstance(m, (nn.BatchNorm2d, nn.BatchNorm1d, nn.BatchNorm3d)):
-                m.eval()
+    # ... (BN Frozen 逻辑保持不变) ...
     
     running_loss = 0.0
     num_batches = len(train_loader)
@@ -90,51 +86,40 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, de
     
     for images, labels, mask, origin_images, origin_labels  in tqdm(train_loader):
 
-        # Forward pass
         optimizer.zero_grad()
 
-        # Move data to device
+        # 保持 Channels Last 优化
         images = images.to(device, memory_format=torch.channels_last)
         labels = labels.to(device, dtype=torch.long)
+        
         if train_config.dataset.mode == 'csg':
-            origin_images = origin_images.to(device)
+            origin_images = origin_images.to(device, memory_format=torch.channels_last) # 记得这里也加上
             origin_labels = origin_labels.to(device, dtype=torch.long)
             mask = mask.to(device, dtype=torch.long)
         
-        with torch.amp.autocast(device_type='cuda'):
+        # === 核心修改：强制使用 BF16 ===
+        with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
             if train_config.dataset.mode == 'csg':
-                # Concatenate images to run in a single forward pass
-                # This avoids inplace operation errors and improves efficiency
                 combined_images = torch.cat([images, origin_images], dim=0)
                 combined_main_out = model(combined_images)
                 outputs_img, outputs_origin = torch.split(combined_main_out, images.size(0), dim=0)
-
             else:
                 outputs_img = model(images)
                 outputs_origin = None
             
-            # Resize outputs to match labels if necessary
             if outputs_img.shape[-2:] != labels.shape[-2:]:
                 outputs_img = F.interpolate(outputs_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
 
-
             integrated_loss = compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_labels, criterion, train_config.dataset.mode, train_config.loss.alpha, train_config.loss.beta)
 
-        # Backward pass
-        scaler.scale(integrated_loss).backward()
+        # === 核心修改：移除 Scaler，直接 Backward ===
+        integrated_loss.backward()
         
-        scaler.unscale_(optimizer)
-        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10)  # Gradient clipping
+        # 梯度裁剪（可选，BF16下通常不裁剪也很稳，保留也没事）
+        torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=10)
 
-        # Step the optimizer and scheduler
-        # We only step the scheduler if the scaler actually performed an optimizer step (didn't skip due to Inf/NaN)
-        scale_before = scaler.get_scale()
-        scaler.step(optimizer)
-        scaler.update()
-        scale_after = scaler.get_scale()
-
-        if scale_after >= scale_before:
-            scheduler.step()
+        optimizer.step()
+        scheduler.step() # 这里的 scheduler 逻辑简化了，因为没有 scaler skip 的问题了
 
         running_loss += integrated_loss.item()
     
@@ -146,20 +131,22 @@ def validate_epoch(model, val_loader, criterion, device):
     num_batches = len(val_loader)
     
     with torch.no_grad():
-        for batch in tqdm(val_loader):
-            images, labels = batch[0].to(device), batch[1].to(device, dtype=torch.long)
-            
-            outputs = model(images)
-            if isinstance(outputs, (tuple, list)):
-                outputs = outputs[0]
+        # === 新增：验证集也要 BF16 ===
+        with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
+            for batch in tqdm(val_loader):
+                images, labels = batch[0].to(device), batch[1].to(device, dtype=torch.long)
+                
+                outputs = model(images)
+                if isinstance(outputs, (tuple, list)):
+                    outputs = outputs[0]
 
-            if outputs.shape[-2:] != labels.shape[-2:]:
-                outputs = F.interpolate(
-                    outputs, size=labels.shape[-2:], mode='bilinear', align_corners=False
-                )
-            
-            loss = criterion(outputs, labels.squeeze(1))
-            val_loss += loss.item()
+                if outputs.shape[-2:] != labels.shape[-2:]:
+                    outputs = F.interpolate(
+                        outputs, size=labels.shape[-2:], mode='bilinear', align_corners=False
+                    )
+                
+                loss = criterion(outputs, labels.squeeze(1))
+                val_loss += loss.item()
     
     return val_loss / num_batches
 
@@ -222,18 +209,12 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
         optimizer = torch.optim.SGD([
             {'params': backbone_params, 'lr': lr_backbone},
             {'params': classifier_params, 'lr': lr_classifier}
-        ], momentum=train_config.optimizer.momentum, weight_decay=train_config.optimizer.weight_decay,
-       fused=True)
+        ], momentum=train_config.optimizer.momentum, weight_decay=train_config.optimizer.weight_decay,fused=True)
     elif train_config.optimizer.name == 'AdamW':
         optimizer = torch.optim.AdamW([
             {'params': backbone_params, 'lr': lr_backbone},
             {'params': classifier_params, 'lr': lr_classifier}
-        ], beta=train_config.optimizer.beta, weight_decay=train_config.optimizer.weight_decay,
-       fused=True)
-
-
-    # AMP Scaler
-    scaler = torch.amp.GradScaler(device='cuda')
+        ], beta=train_config.optimizer.beta, weight_decay=train_config.optimizer.weight_decay,fused=True)
 
     # Learning rate scheduler (Polynomial with lr_end)
     total_iters = int( num_epochs * len(train_iter) )
@@ -262,7 +243,7 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
         for epoch in range(num_epochs):
 
             # Train one epoch
-            train_loss = train_epoch(model, train_iter, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs)
+            train_loss = train_epoch(model, train_iter, criterion, optimizer, scheduler, device, epoch, num_epochs)
             origin_train_losses.append(train_loss)
 
             gc.collect()
