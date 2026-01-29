@@ -3,7 +3,7 @@ import argparse
 from easydict import EasyDict as edict
 
 parser = argparse.ArgumentParser(description='Train')
-parser.add_argument('--train_config_path', default='', help='.yaml file for training', required=True)
+parser.add_argument('--yaml', default='', help='.yaml file for training', required=True)
 arg = parser.parse_args()
 
 def load_train_config(config_path):
@@ -12,7 +12,7 @@ def load_train_config(config_path):
         train_config = edict(train_config)
     return train_config
 
-train_config = load_train_config(arg.train_config_path)
+train_config = load_train_config(arg.yaml)
 
 from helpers.set_seed import setup_seed
 setup_seed(train_config.seed, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
@@ -22,6 +22,7 @@ import gc
 
 import torch
 from torch import nn
+from tqdm import tqdm
 import torch.nn.functional as F
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
@@ -77,7 +78,7 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, de
     if not is_distributed or dist.get_rank() == 0:
         logger(f"Epoch [{epoch+1}/{num_epochs}]\n")
     
-    for images, labels, mask, origin_images, origin_labels  in train_loader:
+    for images, labels, mask, origin_images, origin_labels  in tqdm(train_loader):
 
         # Forward pass
         optimizer.zero_grad()
@@ -135,13 +136,17 @@ def validate_epoch(model, val_loader, criterion, device):
     num_batches = len(val_loader)
     
     with torch.no_grad():
-        for batch_idx, (images, labels, mask, origin_images, origin_labels) in enumerate(val_loader):
-            images = images.to(device)
-            labels = labels.to(device, dtype=torch.long)
+        for batch in tqdm(val_loader):
+            images, labels = batch[0].to(device), batch[1].to(device, dtype=torch.long)
             
-            outputs, _ = model(images)
+            outputs = model(images)
+            if isinstance(outputs, (tuple, list)):
+                outputs = outputs[0]
+
             if outputs.shape[-2:] != labels.shape[-2:]:
-                outputs = F.interpolate(outputs, size=labels.shape[-2:], mode='bilinear', align_corners=False)
+                outputs = F.interpolate(
+                    outputs, size=labels.shape[-2:], mode='bilinear', align_corners=False
+                )
             
             loss = criterion(outputs, labels.squeeze(1))
             val_loss += loss.item()
@@ -220,31 +225,34 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
     ])
 
     # Create scheduler using warmup_iters only.
-    scheduler = WarmupScheduler(optimizer, base_scheduler, warmup_iters=train_config.warmup.warmup_iters, warmup_factor=train_config.warmup.warmup_factor, is_enabled = train_config.warmup.warmup_is_enabled)
+    scheduler = WarmupScheduler(optimizer, base_scheduler, warmup_iters=train_config.warmup.iters, warmup_factor=train_config.warmup.factor, is_enabled = train_config.warmup.enabled)
     
     # Save model path
-    model_path = f"/root/autodl-tmp/models/{train_config.logging.date}{train_config.logging.info}_A{train_config.loss.alpha}B{train_config.loss.beta}_.pth"
+    model_path = f"../models/{train_config.logging.date}{train_config.logging.info}_A{train_config.loss.alpha}B{train_config.loss.beta}_.pth"
 
     # Training loop
-    origin_val_losses = []
-    best_val_loss = float('inf')
+    origin_train_losses = []
+    best_train_loss = float('inf')
 
     try:
         for epoch in range(num_epochs):
 
             # Train one epoch
             train_loss = train_epoch(model, train_iter, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs)
-            
+            origin_train_losses.append(train_loss)
+
             gc.collect()
             torch.cuda.empty_cache()
 
             # Validation
-            origin_val_loss = validate_epoch(model, val_iter, criterion, device)
-            origin_val_losses.append(origin_val_loss)
+            if (epoch+1) % 5 == 0:
+                origin_val_loss = validate_epoch(model, val_iter, criterion, device)
+            else:
+                origin_val_loss = 0.00
 
             # Save the best model in the last 5 epochs
-            if epoch > (num_epochs - 5) and origin_val_loss < best_val_loss :
-                best_val_loss = origin_val_loss
+            if epoch > (num_epochs - 5) and train_loss < best_train_loss :
+                best_train_loss = train_loss
                 if not is_distributed or dist.get_rank() == 0:
                     model_to_save = model
                     if hasattr(model_to_save, 'module'): # Unwrap DDP
@@ -281,7 +289,7 @@ def main():
     get_model_function = models.get_model(train_config.model.name)
     model = get_model_function(num_classes=config.NUM_CLASSES, checkpoint = train_config.model.checkpoint_path).to(device) # modify to match your model
 
-    train(model,device,train_config.train.num_epochs,train_config.train.batch_size,train_config.train.lr_backbone,train_config.train.lr_classifier,train_config.model.from_scratch,train_config.model.model_checkpoint_path)
+    train(model,device,train_config.train.num_epochs,train_config.train.batch_size,train_config.train.lr_backbone,train_config.train.lr_classifier,train_config.model.from_scratch,train_config.model.checkpoint_path)
 
     del model 
     gc.collect() 
