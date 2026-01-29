@@ -1,6 +1,6 @@
 # 种子配置
 seed:
-  42
+  35
 
 # 数据集配置
 dataset:
@@ -10,26 +10,26 @@ dataset:
 
 # 模型配置
 model:
-  name: 'fcn'
+  name: 'segformer'
   from_scratch: false
-  checkpoint_path: '/root/autodl-tmp/models/fcn_r50-d8_512x1024_80k_cityscapes_20200606_113019-03aa804d.pth'
+  checkpoint_path: '../models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth'
 
 # 训练超参数
 train:
-  num_epochs: 2
-  batch_size: 4
-  lr_backbone: 1.0e-06
-  lr_classifier: 1.0e-05
+  num_epochs: 20
+  batch_size: 2
+  lr_backbone: 1.0e-05
+  lr_classifier: 1.0e-04
   bn_frozen: false
 
 # 损失函数权重
 loss:
-  alpha: 1.0
+  alpha: 0.0025
   beta: 1.0
 
 # 优化器
 optimizer:
-  name: "AdamW" # Adam or SGD
+  name: "SGD" # Adam or SGD
   beta: (0.9, 0.999)
   weight_decay: 0.0001
   momentum: 0.9
@@ -42,6 +42,6 @@ warmup:
 
 # 日志与输出
 logging:
-  date: "_1_24_2026"
-  info: "_ONLYFORTEST_"
-  root: "/root/autodl-tmp/log/"
+  date: "_1_29_2026"
+  info: "_BL+CSG+CL+both_A0.0025B1_"
+  root: "../log/"
