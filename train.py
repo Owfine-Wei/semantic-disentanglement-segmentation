@@ -46,17 +46,27 @@ config = get_config(train_config.dataset.name)
 # Log
 logger = Logger(date=train_config.logging.date, info=train_config.logging.info, log_root = train_config.logging.root)
 
-# DDP
-local_rank = int(os.environ.get("LOCAL_RANK", -1))
-is_distributed = local_rank != -1
+# 1. 更加健壮的 rank 获取方式
+# torchrun 会自动设置这些环境变量
+local_rank = int(os.environ.get("LOCAL_RANK", 0)) # 默认 0 方便单卡兼容
+world_size = int(os.environ.get("WORLD_SIZE", 1))
+is_distributed = world_size > 1
 
 if is_distributed:
-    torch.cuda.set_device(local_rank)
-    device = torch.device(f'cuda:{local_rank}')
+    # 2. 必须先初始化进程组，再进行 cuda 操作是更稳健的做法
     if not dist.is_initialized():
-        dist.init_process_group(backend='nccl')
+        dist.init_process_group(backend='nccl', init_method='env://')
+    
+    # 3. 设置设备
+    torch.cuda.set_device(local_rank)
+    device = torch.device('cuda', local_rank)
+    
+    # 打印一下，方便调试（仅在主进程打印）
+    if dist.get_rank() == 0:
+        print(f"Distributed mode enabled. World size: {world_size}")
 else:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("Running in non-distributed mode.")
 
 
 def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, device, epoch, num_epochs):
@@ -84,14 +94,14 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, scaler, de
         optimizer.zero_grad()
 
         # Move data to device
-        images = images.to(device)
+        images = images.to(device, memory_format=torch.channels_last)
         labels = labels.to(device, dtype=torch.long)
         if train_config.dataset.mode == 'csg':
             origin_images = origin_images.to(device)
             origin_labels = origin_labels.to(device, dtype=torch.long)
             mask = mask.to(device, dtype=torch.long)
         
-        with torch.cuda.amp.autocast():
+        with torch.amp.autocast(device_type='cuda'):
             if train_config.dataset.mode == 'csg':
                 # Concatenate images to run in a single forward pass
                 # This avoids inplace operation errors and improves efficiency
@@ -163,7 +173,19 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
     val_iter = load_data(config, mode='origin', split='val', batch_size=batch_size, num_workers=4, distributed=False)
     
     # Create model
-    model = model.to(device)
+    model = model.to(device, memory_format=torch.channels_last)
+
+    # ===【新增】Torch 2.x 核心编译优化 ===
+    # mode='reduce-overhead' 适合这种训练循环较小的场景
+    # 如果报错，可以尝试 mode='default' 或者直接去掉 mode 参数
+    try:
+        model = torch.compile(model, mode='reduce-overhead')
+        if not is_distributed or dist.get_rank() == 0:
+            logger("Torch.compile enabled!\n")
+    except Exception as e:
+        print(f"Compilation failed: {e}")
+    # ===================================
+
 
     if not is_distributed or dist.get_rank() == 0:
         logger(f"Model moved to {device}\n")
@@ -200,16 +222,18 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
         optimizer = torch.optim.SGD([
             {'params': backbone_params, 'lr': lr_backbone},
             {'params': classifier_params, 'lr': lr_classifier}
-        ], momentum=train_config.optimizer.momentum, weight_decay=train_config.optimizer.weight_decay)
+        ], momentum=train_config.optimizer.momentum, weight_decay=train_config.optimizer.weight_decay,
+       fused=True)
     elif train_config.optimizer.name == 'AdamW':
         optimizer = torch.optim.AdamW([
             {'params': backbone_params, 'lr': lr_backbone},
             {'params': classifier_params, 'lr': lr_classifier}
-        ], beta=train_config.optimizer.beta, weight_decay=train_config.optimizer.weight_decay)
+        ], beta=train_config.optimizer.beta, weight_decay=train_config.optimizer.weight_decay,
+       fused=True)
 
 
     # AMP Scaler
-    scaler = torch.cuda.amp.GradScaler()
+    scaler = torch.amp.GradScaler(device='cuda')
 
     # Learning rate scheduler (Polynomial with lr_end)
     total_iters = int( num_epochs * len(train_iter) )
@@ -295,6 +319,10 @@ def main():
     gc.collect() 
     if torch.cuda.is_available():
         torch.cuda.empty_cache() 
+
+    # ===【新增】===
+    if dist.is_initialized():
+        dist.destroy_process_group()
 
 if __name__ == "__main__" :
     main()

@@ -12,7 +12,7 @@ dataset:
 model:
   name: 'segformer'
   from_scratch: false
-  checkpoint_path: '../models/segformer_mit-b3_8x1_1024x1024_160k_cityscapes_20211206_224823-a8f8a177.pth'
+  checkpoint_path: None
 
 # 训练超参数
 train:

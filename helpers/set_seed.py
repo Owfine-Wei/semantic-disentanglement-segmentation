@@ -1,48 +1,34 @@
 import os
 import random
 import numpy as np
+import torch # 移动到顶部，因为现在是核心依赖
 
 def setup_seed(seed=42, deterministic=True, is_enabled=True,
                set_cublas_workspace: bool = True,
                cublas_workspace_config: str = ':4096:8'):
     """
-    Optimized seed locking function for semantic segmentation fine-tuning.
-    Ensures consistent data augmentation and shuffling while avoiding 
-    RuntimeErrors from non-deterministic loss functions.
+    针对语义分割微调优化的种子锁定函数（脱离 MMEngine 版）。
     """
 
     if not is_enabled:
-        print("No seed fixed")
+        print("Seed locking is disabled.")
         return
 
-    # 1. Set CuBLAS environment variable (Crucial for reproducibility on CUDA >= 10.2)
+    # 1. 设置 CuBLAS 环境变量 (对 CUDA >= 10.2 的复现至关重要)
     if deterministic and set_cublas_workspace:
+        # 必须在第一次调用 CUDA 算子之前设置
         os.environ['CUBLAS_WORKSPACE_CONFIG'] = cublas_workspace_config
         print(f"Set CUBLAS_WORKSPACE_CONFIG={cublas_workspace_config}")
 
-    import torch
-    from mmengine.runner import set_random_seed
-
-    # 2. MMEngine high-level seed setting 
-    # Handles DataLoader workers, distributed rank offsets, and basic library seeds.
-    # We set deterministic=False here to manually control it with more precision below.
-    set_random_seed(seed, deterministic=False)
-
-    # 3. Redundant low-level locking for core libraries
-    # This ensures consistency for data augmentation and batch shuffling.
+    # 2. 基础 Python 与 NumPy 种子
     random.seed(seed)
     np.random.seed(seed)
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
     os.environ['PYTHONHASHSEED'] = str(seed)
 
-    # 4. Deterministic behavior control
-    if deterministic:
-        # Enable deterministic convolution algorithms
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
-        
+    # 3. PyTorch CPU 与 GPU 种子
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed) # 如果使用多显卡
 
 if __name__ == "__main__":
     setup_seed(42)
