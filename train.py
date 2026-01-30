@@ -38,7 +38,7 @@ from helpers.integrated_loss import compute_integrated_loss
 os.environ['TRANSFORMERS_OFFLINE'] = '1'
 os.environ['HF_DATASETS_OFFLINE'] = '1'
 os.environ['SMP_SKIP_CHECKPOINT_CHECK'] = '1'
-
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 # config
 config = get_config(train_config.dataset.name)
