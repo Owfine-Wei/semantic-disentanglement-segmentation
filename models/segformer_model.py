@@ -6,7 +6,7 @@ from transformers import SegformerForSemanticSegmentation, SegformerConfig
 @register_models("segformer")
 def get_model(num_classes, checkpoint=None):
     # 本地配置和基础权重的目录（必须包含 config.json）
-    local_base_path = "/root/autodl-tmp/segformer-b3-weights/"
+    local_base_path = "../segformer-b3-weights/"
     
     # 1. 无论如何，先从本地加载配置并初始化模型结构
     # 这样可以保证在断网环境下也能建立模型

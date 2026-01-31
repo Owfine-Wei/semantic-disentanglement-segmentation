@@ -1,25 +1,44 @@
+# ========================================================
+# 1. 第一优先级：设置环境变量 (必须在 import torch 之前)
+# ========================================================
+import os
+# 如果是多卡训练或使用了特殊的卷积算子，必须设置这个
+os.environ['CUBLAS_WORKSPACE_CONFIG'] = ':4096:8' 
+
+# ========================================================
+# 2. 第二优先级：基础库导入
+# ========================================================
 import yaml
 import argparse
 from easydict import EasyDict as edict
+import gc
 
-parser = argparse.ArgumentParser(description='Train')
-parser.add_argument('--yaml', default='', help='.yaml file for training', required=True)
-arg = parser.parse_args()
+# ========================================================
+# 3. 第三优先级：配置加载与种子初始化
+# ========================================================
+def parse_args():
+    parser = argparse.ArgumentParser(description='Train')
+    parser.add_argument('--yaml', default='', help='.yaml file for training', required=True)
+    parser.add_argument('--local_rank', type=int, default=0, help='DDP local rank') # 增加 DDP 支持
+    return parser.parse_args()
+
+args = parse_args()
 
 def load_train_config(config_path):
     with open(config_path, 'r', encoding='utf-8') as f:
-        train_config = yaml.safe_load(f)
-        train_config = edict(train_config)
-    return train_config
+        config = yaml.safe_load(f)
+        return edict(config)
 
-train_config = load_train_config(arg.yaml)
+train_config = load_train_config(args.yaml)
 
+# 导入并立即运行种子设置
 from helpers.set_seed import setup_seed
-setup_seed(train_config.seed, deterministic=True)  # CUBLAS_WORKSPACE_CONFIG=':4096:8'
+# 如果是单卡，rank 默认为 0；如果是 DDP，传入 args.local_rank
+setup_seed(train_config.seed, deterministic=True, rank=getattr(args, 'local_rank', 0))
 
-import os
-import gc
-
+# ========================================================
+# 4. 第四优先级：Torch 及其他依赖导入 (此时种子已锁死)
+# ========================================================
 import torch
 from torch import nn
 from tqdm import tqdm
@@ -92,7 +111,7 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, device, ep
         if train_config.dataset.mode == 'csg':
             origin_images = origin_images.to(device, memory_format=torch.channels_last) # 记得这里也加上
             origin_labels = origin_labels.to(device, dtype=torch.long)
-            mask = mask.to(device, dtype=torch.long)
+            mask = mask.to(device, dtype=torch.float32)
         
         # === 核心修改：强制使用 BF16 ===
         with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
