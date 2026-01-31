@@ -46,7 +46,7 @@ def compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_la
 
         # resize mask to outputs_img size for consistency computation
         if mask.shape[-2:] != outputs_img.shape[-2:]:
-            mask = F.interpolate(mask.float().unsqueeze(1), size=outputs_img.shape[-2:], mode='nearest').squeeze(1).long()
+            mask = F.interpolate(mask.float().unsqueeze(1), size=outputs_img.shape[-2:], mode='nearest').squeeze(1).float()
 
         # add channel dim for broadcasting
         mask = mask.unsqueeze(1) # B 1 H W

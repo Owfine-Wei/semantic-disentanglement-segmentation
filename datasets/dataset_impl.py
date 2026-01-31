@@ -189,7 +189,7 @@ class FOREBACK_Dataset(Origin_Dataset):
 
         image = self.normalize(image)
         label = label.long()
-        mask = mask.long()
+        mask = mask.float()
 
         # 返回 image, label, mask, 其他, 其他
         return image, label, mask, None, None
@@ -253,7 +253,7 @@ class CSG_Dataset(Origin_Dataset):
         # 归一化和格式转换
         origin_image_normalized = self.normalize(origin_image)
         image_normalized = self.normalize(image)
-        mask = mask.long()
+        mask = mask.float()
 
         # 返回项顺序: image, label, mask, origin_image, origin_label
         return image_normalized, label, mask, origin_image_normalized, origin_label
