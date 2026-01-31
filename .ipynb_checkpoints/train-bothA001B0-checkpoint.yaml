@@ -25,7 +25,7 @@ train:
 # 损失函数权重
 loss:
   alpha: 0.01
-  beta: 1.0
+  beta: 0.0
 
 # 优化器
 optimizer:
@@ -43,5 +43,5 @@ warmup:
 # 日志与输出
 logging:
   date: "_1_31_2026"
-  info: "_BL+CSG+CL+both_A0.01B1_lrX100_LRdiff_"
+  info: "_BL+CSG+CL+both_A001B0__"
   root: "../log/"

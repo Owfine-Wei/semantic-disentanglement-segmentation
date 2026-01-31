@@ -43,5 +43,5 @@ warmup:
 # 日志与输出
 logging:
   date: "_1_31_2026"
-  info: "_BL+CSG+CL+both_A0.01B1_lrX100_LRdiff_"
+  info: "_BL+CSG+CL+both_A001B1_"
   root: "../log/"
