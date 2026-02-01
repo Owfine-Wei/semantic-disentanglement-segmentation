@@ -9,20 +9,22 @@ saves comparison overlays and charts into `output_dir`.
 import os
 import cv2
 import torch
+from tqdm import tqdm
+import torch.nn.functional as F
 import random
 import matplotlib.pyplot as plt
 
 import models 
-from datasets import get_config
-from helpers.visualize_val import (preprocess_image, decode_segmap, overlay_images)
+from configs import get_config
+from visualize_val import (preprocess_image, decode_segmap, overlay_images)
 
 # ======== Modified by User ========
 
 dataset_name = 'cityscapes'
 
-model_name = 'fcn'
+model_name = 'segformer'
 
-model_path = ''
+model_path = None
 
 # ==================================
 
@@ -43,8 +45,8 @@ def visualize_foreback_test(model, device, img_root, mask_root, output_dir, mean
     """
 
     print(f"\n--- Processing {task_name} ---")
-    print(f"Root: {img_root}")
-    print(f"Output: {output_dir}")
+    # print(f"Root: {img_root}")
+    # print(f"Output: {output_dir}")
 
     os.makedirs(output_dir, exist_ok=True)
 
@@ -55,30 +57,32 @@ def visualize_foreback_test(model, device, img_root, mask_root, output_dir, mean
         for file in files:
             if file.endswith('.png') or file.endswith('.jpg'):
                 test_images.append(os.path.join(root, file))
+    test_images.sort()
     for root, dirs, files in os.walk(mask_root):
         for file in files:
             if file.endswith('.png') or file.endswith('.jpg'):
                 test_masks.append(os.path.join(root, file))
+    test_masks.sort()
 
     if not test_images:
         print(f"No images found in {img_root}")
         return
 
     # randomly sample up to `num_samples` images
-    num_samples = 20
+    num_samples = 500
     total_images = len(test_images)
     num_to_select = min(num_samples, total_images)
     random_indices = random.sample(range(total_images), num_to_select)
     selected_images = [test_images[i] for i in random_indices]
     selected_masks = [test_masks[i] for i in random_indices]
 
-    print(f"Processing {len(selected_images)} images...")
+    # print(f"Processing {len(selected_images)} images...")
 
     with torch.no_grad():
-        for i, img_path in enumerate(selected_images):
+        for i, img_path in enumerate(tqdm(selected_images)):
             mask_path = selected_masks[i]
 
-            print(f"Processing: {img_path}")
+            # print(f"Processing: {img_path}")
 
             # preprocess image and keep original RGB for visualization
             img_tensor, original_img = preprocess_image(img_path, mean, std)
@@ -89,12 +93,22 @@ def visualize_foreback_test(model, device, img_root, mask_root, output_dir, mean
 
             img_tensor = img_tensor.to(device)
 
-            output, _ = model(img_tensor)
+            output = model(img_tensor, return_features=False, return_dict=False)
             pred = torch.argmax(output, dim=1).squeeze(0)
 
-            # apply mask: set prediction to 255 (ignore) where mask is 0
+            if pred.shape[-2:] != mask_tensor.shape[-2:]:
+                # 1. 增加 Batch 和 Channel 维度，使其变为 [1, 1, H, W]
+                # 2. 进行插值
+                # 3. 移除多余的维度还原回 [H, W]
+                pred = F.interpolate(
+                    input=pred.unsqueeze(0).unsqueeze(0).float(), 
+                    size=mask_tensor.shape[-2:], 
+                    mode='nearest'
+                ).squeeze()
+
+            # apply mask: set prediction to 255 (ignore) where mask is 255
             pred_mask = pred.clone()
-            pred_mask[mask_tensor == 0] = 255
+            pred_mask[mask_tensor == 1] = 255
             pred_mask = pred_mask.cpu().numpy()
 
             # convert predicted ids to color map
@@ -132,16 +146,20 @@ def visualize_foreback_test(model, device, img_root, mask_root, output_dir, mean
             plt.savefig(os.path.join(group_dir, f"comparison_{filename}"))
             plt.close()
 
-    print(f"Done with {task_name}!")
+    # print(f"Done with {task_name}!")
 
 
 def main():
     """Load model and visualize foreground and background validation sets."""
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
+    # Foreground/Background Visualization Results
+    FORE_VISUAL_DIR = '../outputs/segformer_BL_segmentation/foreground/'
+    BACK_VISUAL_DIR = '../outputs/segformer_BL_segmentation/background/'
 
-    print("Loading model...")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # print(f"Using device: {device}")
+
+    # print("Loading model...")
 
     get_model_function = models.get_model(model_name)
     model = get_model_function(num_classes=19, checkpoint=model_path)
@@ -152,9 +170,9 @@ def main():
     visualize_foreback_test(
         model,
         device,
-        config.DIRS['foreground']['val'],
-        config.DIRS['foreground']['mask'],
-        config.FORE_VISUAL_DIR,
+        config.FORE_IMGS_DIR + 'val',
+        config.FORE_MASK_DIR + 'val' ,
+        FORE_VISUAL_DIR,
         config.RGB_MEAN,
         config.RGB_STD,
         "Foreground",
@@ -163,9 +181,9 @@ def main():
     visualize_foreback_test(
         model,
         device,
-        config.DIRS['background']['val'],
-        config.DIRS['background']['mask'],
-        config.BACK_VISUAL_DIR,
+        config.BACK_IMGS_DIR + 'val',
+        config.BACK_MASK_DIR + 'val' ,
+        BACK_VISUAL_DIR,
         config.RGB_MEAN,
         config.RGB_STD,
         "Background",

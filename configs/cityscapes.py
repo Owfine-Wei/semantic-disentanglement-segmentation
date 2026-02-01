@@ -25,14 +25,6 @@ class CityScapesConfig:
     LABEL_SUFFIX = '_gtFine_labelTrainIds.png'
     DATA_SPLIT = ['train', 'val']
 
-    # Foreground/Background Visualization Results
-    FORE_VISUAL_DIR = '../data/Result/Fore_Test_Result/'
-    BACK_VISUAL_DIR = '../data/Result/Back_Test_Result/'
-
-    # Cityscapes Visualization Results
-    VAL_IMGS_DIR = '../data/Cityscapes/leftImg8bit/val/'
-    VISUAL_IMGS_DIR = '../data/Cityscapes/leftImgs8bit/val/'
-
     # MODEL (Where your model saved)
     MODEL_ROOT = '../models/'
 
@@ -54,6 +46,7 @@ class CityScapesConfig:
     # Foreground/Background Masks
     FORE_MASK_DIR = '../data/ForeBackground/mask_fg/'
     BACK_MASK_DIR = '../data/ForeBackground/mask_bg/'
+
 
     # ==============================================================================
     # DATA PROCESSING

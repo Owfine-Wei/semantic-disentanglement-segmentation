@@ -8,6 +8,7 @@ overlay predictions on the original image, and save sample visualizations.
 import os
 import cv2
 import torch
+from tqdm import tqdm
 import random
 import numpy as np
 import matplotlib.pyplot as plt
@@ -20,9 +21,9 @@ from configs import get_config
 
 dataset_name = 'cityscapes'
 
-model_name = 'fcn'
+model_name = 'segformer'
 
-model_path = ''
+model_path = None
 
 # ==================================
 
@@ -99,19 +100,19 @@ def visualize_val(model, device, img_root, output_dir, mean, std):
         return
 
     # Choose Images Randomly (up to `num_samples`)
-    num_samples = 20
+    num_samples = 500
     selected_images = random.sample(test_images, min(num_samples, len(test_images)))
 
-    print(f"Processing {len(selected_images)} images...")
+    # print(f"Processing {len(selected_images)} images...")
 
     with torch.no_grad():
-        for i, img_path in enumerate(selected_images):
-            print(f"Processing: {img_path}")
+        for i, img_path in enumerate(tqdm(selected_images)):
+            # print(f"Processing: {img_path}")
 
             img_tensor, original_img = preprocess_image(img_path, mean, std)
             img_tensor = img_tensor.to(device)
 
-            output, _ = model(img_tensor)
+            output = model(img_tensor, return_features=False, return_dict=False)
             pred = torch.argmax(output, dim=1).squeeze(0).cpu().numpy()
 
             seg_color = decode_segmap(pred, nc=256)
@@ -146,16 +147,18 @@ def visualize_val(model, device, img_root, output_dir, mean, std):
             plt.savefig(os.path.join(group_dir, f"comparison_{filename}"))
             plt.close()
 
-    print(f"Done! Results saved to {output_dir}")
+    # print(f"Done! Results saved to {output_dir}")
 
 
 def main():
     """Load model and run `visualize_val` over `config.VAL_IMGS_DIR`."""
 
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    print(f"Using device: {device}")
+    VISUAL_IMGS_DIR = '../outputs/segformer_segmentation/origin/'
 
-    print("Loading model...")
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    # print(f"Using device: {device}")
+
+    # print("Loading model...")
 
     get_model_function = models.get_model(model_name)
     model = get_model_function(num_classes=19, checkpoint=model_path)
@@ -164,7 +167,7 @@ def main():
     model.eval()
 
     # Test
-    visualize_val(model, device, config.VAL_IMGS_DIR, config.VISUAL_IMGS_DIR, config.RGB_MEAN, config.RGB_STD)
+    visualize_val(model, device, config.VAL_IMG_DIR, VISUAL_IMGS_DIR, config.RGB_MEAN, config.RGB_STD)
 
 
 if __name__ == '__main__':

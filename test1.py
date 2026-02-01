@@ -28,12 +28,7 @@ for images, labels, masks, origin_images, origin_labels in loader:
     origin_labels = origin_labels.to(device, dtype=torch.long)
     masks = masks.to(device, dtype=torch.float32)
 
-    combined_images = torch.cat([images, origin_images], dim=0)
-    combined_main_out = model(combined_images)
-    combined_main_out = combined_main_out.logits
-    outputs_img, outputs_origin = torch.split(combined_main_out, images.size(0), dim=0)
+    logits_img, features_img = model(images, return_features=True, return_dict=False) 
+    logits_origin_img, features_origin_img = model(origin_images, return_features=True, return_dict=False)
 
-    if outputs_img.shape[-2:] != labels.shape[-2:]:
-        outputs_img = F.interpolate(outputs_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
-
-    loss = compute_integrated_loss(outputs_img, labels, masks, outputs_origin, origin_labels, criterion, 'csg', 0.01, 1)
+    loss = compute_integrated_loss(logits_img, labels, masks, logits_origin_img, origin_labels, features_img, features_origin_img, criterion, 'csg', 1, 1)

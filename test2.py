@@ -15,7 +15,7 @@ def calculate_loss_averages(file_path):
                 # 2. 提取数值
                 # 这里假设格式固定为 "标签数值"，通过替换掉标签文字来提取
                 l_img = float(parts[0].replace('loss_img', ''))
-                l_consist = float(parts[1].replace('consist_loss', ''))
+                l_consist = float(parts[1].replace('loss_consist', ''))
                 l_origin = float(parts[2].replace('loss_origin', ''))
                 
                 # 3. 累加
