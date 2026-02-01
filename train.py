@@ -51,7 +51,6 @@ from configs import get_config
 from helpers.Logger import Logger
 from helpers.set_seed import setup_seed
 from datasets.dataset_impl import load_data
-from helpers.Warmup_scheduler import WarmupScheduler
 from helpers.integrated_loss import compute_integrated_loss
 
 os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
@@ -88,8 +87,13 @@ else:
 def train_epoch(model, train_loader, criterion, optimizer, scheduler, device, epoch, num_epochs): # 去掉了 scaler 参数
 
     model.train()
-    # ... (BN Frozen 逻辑保持不变) ...
     
+    # 冻结 BN (Freeze BN)
+    if train_config.train.bn_frozen:
+        for m in model.modules():
+            if isinstance(m, torch.nn.modules.batchnorm._BatchNorm):
+                m.eval()
+
     running_loss = 0.0
     num_batches = len(train_loader)
     
@@ -100,7 +104,7 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, device, ep
     if not is_distributed or dist.get_rank() == 0:
         logger(f"Epoch [{epoch+1}/{num_epochs}]\n")
     
-    for images, labels, mask, origin_images, origin_labels  in tqdm(train_loader):
+    for images, labels, mask, origin_images, origin_labels in tqdm(train_loader):
 
         optimizer.zero_grad()
 
@@ -116,19 +120,15 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, device, ep
         # === 核心修改：强制使用 BF16 ===
         with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
             if train_config.dataset.mode == 'csg':
-                combined_images = torch.cat([images, origin_images], dim=0)
-                combined_main_out = model(combined_images)
-                combined_main_out = combined_main_out.logits
-                outputs_img, outputs_origin = torch.split(combined_main_out, images.size(0), dim=0)
+                logits_img, features_img = model(images, return_features=True, return_dict=False) 
+                logits_origin_img, features_origin_img = model(origin_images, return_features=True, return_dict=False)
             else:
-                outputs_img = model(images)
-                outputs_img = outputs_img.logits
-                outputs_origin = None
-            
-            if outputs_img.shape[-2:] != labels.shape[-2:]:
-                outputs_img = F.interpolate(outputs_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
+                logits_img = model(images, return_features=False, return_dict=False)
+                features_img = None
+                logits_origin_img = None
+                features_origin_img = None
 
-            integrated_loss = compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_labels, criterion, train_config.dataset.mode, train_config.loss.alpha, train_config.loss.beta)
+            integrated_loss = compute_integrated_loss(logits_img, labels, mask, logits_origin_img, origin_labels, features_img, features_origin_img, criterion, train_config.dataset.mode, train_config.loss.alpha, train_config.loss.beta)
 
         # === 核心修改：移除 Scaler，直接 Backward ===
         integrated_loss.backward()
@@ -161,7 +161,7 @@ def validate_epoch(model, val_loader, criterion, device):
                 
                 # 3. 提取 Logits 并转为 float32 以确保 Loss 计算稳定
                 # 注意：将 logits 转回 float32 是解决很多奇怪报错的关键
-                logits = outputs.logits.float() 
+                logits = outputs.float() 
 
                 # 4. 尺寸对齐 (SegFormer 输出是 1/4)
                 if logits.shape[-2:] != labels.shape[-2:]:
@@ -236,22 +236,35 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
             {'params': classifier_params, 'lr': lr_classifier}
         ], beta=train_config.optimizer.beta, weight_decay=train_config.optimizer.weight_decay,fused=True)
 
-    # Learning rate scheduler (Polynomial with lr_end)
-    total_iters = int( num_epochs * len(train_iter) )
-    min_lr_ratio = 1.0 / 50.0 
+    # 计算总迭代步数
+    total_iters = int(num_epochs * len(train_iter))
+    # 预热步数：建议设置为总步数的 5% 或 1500 次迭代
+    warmup_iters = 1500 
     power = 0.9
+    min_lr = 1e-7 # 建议设为极小值，Poly 衰减的终点通常趋向于 0
 
-    def lr_lambda(step):
-        coeff = (1 - step / total_iters) ** power
-        return coeff * (1 - min_lr_ratio) + min_lr_ratio
+    def lr_lambda(current_step):
+        # 1. Linear Warmup 阶段
+        if current_step < warmup_iters:
+            return float(current_step) / float(max(1, warmup_iters))
+        
+        # 2. Polynomial Decay 阶段
+        # 计算从 warmup 结束到训练结束的进度
+        progress = (current_step - warmup_iters) / float(max(1, total_iters - warmup_iters))
+        progress = min(progress, 1.0) # 确保不会超过 1
+        
+        coeff = (1.0 - progress) ** power
+        
+        # 返回的是相对于初始 LR 的倍数
+        return coeff
 
-    base_scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=[
-        lr_lambda, lr_lambda
-    ])
+    # 注意：LambdaLR 会将返回的 lambda 值与对应参数组的 base_lr 相乘
+    # 确保你的 optimizer 有两个参数组 (Backbone 和 Head)
+    scheduler = torch.optim.lr_scheduler.LambdaLR(
+        optimizer, 
+        lr_lambda=[lr_lambda, lr_lambda]
+    )
 
-    # Create scheduler using warmup_iters only.
-    scheduler = WarmupScheduler(optimizer, base_scheduler, warmup_iters=train_config.warmup.iters, warmup_factor=train_config.warmup.factor, is_enabled = train_config.warmup.enabled)
-    
     # Save model path
     model_path = f"../models/{train_config.logging.date}{train_config.logging.info}_A{train_config.loss.alpha}B{train_config.loss.beta}_.bin"
 

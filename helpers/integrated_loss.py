@@ -12,15 +12,15 @@ import torch.nn.functional as F
 import torch
 
 
-def compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_labels, criterion, mode, alpha, beta):
+def compute_integrated_loss(logits_img, labels, masks, logits_origin_img, origin_labels, features_img, features_origin_img, criterion, mode, alpha, beta):
     """
     Compute integrated loss used for CSG training.
 
     Args:
-        outputs_img: logits from the class-erased image branch.
+        logits_img: logits from the class-erased image branch.
         labels: corresponding label tensor for the class-erased image.
-        mask: binary mask marking erased/ignored pixels (0.0/1.0).
-        outputs_origin: logits from the original image branch.
+        masks: binary masks marking erased/ignored pixels (0.0/1.0).
+        logits_origin_img: logits from the original image branch.
         origin_labels: labels for the original image.
         criterion: segmentation loss function (CrossEntropyLoss).
         mode: when 'csg', include consistency and origin losses.
@@ -31,44 +31,50 @@ def compute_integrated_loss(outputs_img, labels, mask, outputs_origin, origin_la
         integrated_loss: scalar tensor combining the selected loss terms.
     """
 
+    if logits_img.shape[-2:] != labels.shape[-2:]:
+        logits_img = F.interpolate(logits_img, size=labels.shape[-2:], mode='bilinear', align_corners=False)
+
     # classification loss on the processed (csg) image
-    loss_img = criterion(outputs_img, labels.squeeze(1))
+    loss_img = criterion(logits_img, labels.squeeze(1))
 
     if mode == 'csg' :
-        # ensure outputs_origin matches origin_labels spatial size
-        if outputs_origin.shape[-2:] != origin_labels.shape[-2:]:
-            outputs_origin = F.interpolate(
-                outputs_origin, size=origin_labels.shape[-2:], mode='bilinear', align_corners=False
+        # ensure logits_origin_img matches origin_labels spatial size
+        if logits_origin_img.shape[-2:] != origin_labels.shape[-2:]:
+            logits_origin_img = F.interpolate(
+                logits_origin_img, size=origin_labels.shape[-2:], mode='bilinear', align_corners=False
             )
 
         # classification loss on the original image
-        loss_origin = criterion(outputs_origin, origin_labels.squeeze(1))
+        loss_origin = criterion(logits_origin_img, origin_labels.squeeze(1))
 
-        # resize mask to outputs_img size for consistency computation
-        if mask.shape[-2:] != outputs_img.shape[-2:]:
-            mask = F.interpolate(mask.float().unsqueeze(1), size=outputs_img.shape[-2:], mode='nearest').squeeze(1).float()
+        # resize masks to logits_img size for consistency computation
+        if masks.shape[-2:] != features_origin_img.shape[-2:]:
+            masks = F.interpolate(masks.float().unsqueeze(1), size=features_origin_img.shape[-2:], mode='nearest').squeeze(1).float()
 
         # add channel dim for broadcasting
-        mask = mask.unsqueeze(1) # B 1 H W
+        masks = masks.unsqueeze(1) # B 1 H W
 
         # freeze the gradient propagation from origin outputs
-        outputs_origin_frozen = outputs_origin.detach() # B num_classes H W
+        features_origin_img_frozen = features_origin_img.detach() # B num_classes H W
 
-        # difference only on non-masked (valid) pixels
-        diff = (outputs_img - outputs_origin_frozen) * (1.0 - mask) # B num_classes H W
+        # difference only on non-masksed (valid) pixels
+        diff = (features_img - features_origin_img_frozen) * (1.0 - masks) # B num_classes H W
         diff_square = torch.sum(diff**2, dim=(1,2,3), keepdim = True) # B 1 1 1
 
-        # number of valid pixels times number of channels (classes)
-        valid_pixels = torch.sum((1.0 - mask), dim=(1,2,3), keepdim = True)  
-        # B 1 1 1
+        num_channels = features_img.shape[1]
+        spatial_valid_pixels = torch.sum(1.0 - masks) # 空间点数
+        total_valid_elements = spatial_valid_pixels * num_channels + 1e-6 # 总元素数
 
         # mean squared error per sample over valid pixels (small epsilon to avoid div0)
-        consist_loss = diff_square / (valid_pixels + 1e-6)
+        consist_loss = diff_square / (total_valid_elements)
 
         # mean consist_loss in one batch
         consist_loss = consist_loss.mean()
 
         integrated_loss = loss_img + alpha * consist_loss + beta * loss_origin
+
+        print(f'loss_img{loss_img:.6f}, loss_consist{consist_loss:.6f}, loss_origin{loss_origin:.6f}')
+
     else:
         integrated_loss = loss_img
 

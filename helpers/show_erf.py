@@ -148,7 +148,6 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 	input_var = input_tensor.to(device).requires_grad_(True)
 
 	out = model(input_var)
-	out = out.logits
 
 	# handle models returning tuple/list or dict
 	if isinstance(out, (tuple, list)):

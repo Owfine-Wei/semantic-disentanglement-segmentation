@@ -18,27 +18,27 @@ model:
 train:
   num_epochs: 50
   batch_size: 2
-  lr_backbone: 1.0e-02
-  lr_classifier: 1.0e-02
+  lr_backbone: 6.0e-6
+  lr_classifier: 6.0e-5
   bn_frozen: false
 
 # 损失函数权重
 loss:
-  alpha: 0.01
+  alpha: 10.0
   beta: 1.0
 
 # 优化器
 optimizer:
-  name: "SGD" # Adam or SGD
+  name: "AdamW" # AdamW or SGD
   beta: (0.9, 0.999)
-  weight_decay: 0.0001
+  weight_decay: 0.01
   momentum: 0.9
 
 # 学习率预热
 warmup:
   enabled: true
-  iters: 1000
-  factor: 0.01
+  iters: 1500
+  factor: 0.001
 
 # 日志与输出
 logging:

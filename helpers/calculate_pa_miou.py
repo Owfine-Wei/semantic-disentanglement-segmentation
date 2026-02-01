@@ -28,7 +28,6 @@ def calculate_metrics(model, val_loader, device, num_classes, train_id_dict=None
             images, labels = batch[0].to(device), batch[1].to(device, dtype=torch.long)
             
             outputs = model(images)
-            outputs = outputs.logits
             if isinstance(outputs, (tuple, list)):
                 outputs = outputs[0]
 

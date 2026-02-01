@@ -33,7 +33,6 @@ def cal_fore_back_iou(model, val_loader, train_ids, device):
             images, labels, masks = batch[0].to(device), batch[1].to(device), batch[2].to(device)
 
             outputs = model(images)
-            outputs = outputs.logits
             if isinstance(outputs, (tuple, list)):
                 outputs = outputs[0]
 
