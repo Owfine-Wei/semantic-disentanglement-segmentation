@@ -120,8 +120,20 @@ def train_epoch(model, train_loader, criterion, optimizer, scheduler, device, ep
         # === 核心修改：强制使用 BF16 ===
         with torch.amp.autocast(device_type='cuda', dtype=torch.bfloat16):
             if train_config.dataset.mode == 'csg':
-                logits_img, features_img = model(images, return_features=True, return_dict=False) 
-                logits_origin_img, features_origin_img = model(origin_images, return_features=True, return_dict=False)
+                # 1. 在 batch 维度(dim=0)进行拼接
+                # 假设 images 和 origin_images 的形状都是 [B, C, H, W]
+                combined_images = torch.cat([images, origin_images], dim=0) # 得到 [2*B, C, H, W]
+                
+                # 2. 只调用一次模型
+                combined_logits, combined_features = model(combined_images, return_features=True, return_dict=False)
+                
+                # 3. 将结果切分回原来的两个变量
+                batch_size = images.shape[0]
+                logits_img = combined_logits[:batch_size]           # 前半部分是 processed image
+                logits_origin_img = combined_logits[batch_size:]    # 后半部分是 original image
+                
+                features_img = combined_features[:batch_size]       # 前半部分特征
+                features_origin_img = combined_features[batch_size:] # 后半部分特征
             else:
                 logits_img = model(images, return_features=False, return_dict=False)
                 features_img = None
@@ -157,7 +169,7 @@ def validate_epoch(model, val_loader, criterion, device):
                 labels = batch[1].to(device, dtype=torch.long)
                 
                 # 2. 前向传播
-                outputs = model(images)
+                outputs = model(images, return_features=False, return_dict=False)
                 
                 # 3. 提取 Logits 并转为 float32 以确保 Loss 计算稳定
                 # 注意：将 logits 转回 float32 是解决很多奇怪报错的关键
@@ -234,7 +246,7 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
         optimizer = torch.optim.AdamW([
             {'params': backbone_params, 'lr': lr_backbone},
             {'params': classifier_params, 'lr': lr_classifier}
-        ], beta=train_config.optimizer.beta, weight_decay=train_config.optimizer.weight_decay,fused=True)
+        ], betas=train_config.optimizer.betas, weight_decay=train_config.optimizer.weight_decay,fused=True)
 
     # 计算总迭代步数
     total_iters = int(num_epochs * len(train_iter))

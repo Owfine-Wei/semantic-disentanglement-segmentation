@@ -16,11 +16,11 @@ model:
 
 # 训练超参数
 train:
-  num_epochs: 50
+  num_epochs: 5
   batch_size: 2
   lr_backbone: 6.0e-6
   lr_classifier: 6.0e-5
-  bn_frozen: false
+  bn_frozen: true
 
 # 损失函数权重
 loss:
@@ -30,7 +30,9 @@ loss:
 # 优化器
 optimizer:
   name: "AdamW" # AdamW or SGD
-  beta: (0.9, 0.999)
+  betas:
+   - 0.9
+   - 0.999
   weight_decay: 0.01
   momentum: 0.9
 
@@ -42,6 +44,6 @@ warmup:
 
 # 日志与输出
 logging:
-  date: "_1_31_2026"
-  info: "_BL+CSG+CL+both_A0.01B1_lrX100_LRdiff_"
+  date: "_2_1_2026"
+  info: "_ONLYFORTEST_"
   root: "../log/"
