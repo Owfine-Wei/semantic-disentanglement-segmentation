@@ -32,7 +32,7 @@ def cal_fore_back_iou(model, val_loader, train_ids, device):
             # 兼容性解包，假设 masks 在第三个位置
             images, labels, masks = batch[0].to(device), batch[1].to(device), batch[2].to(device)
 
-            outputs = model(images)
+            outputs = model(images, retrun_features=False, return_dict=False)
             if isinstance(outputs, (tuple, list)):
                 outputs = outputs[0]
 

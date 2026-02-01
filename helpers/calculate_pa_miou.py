@@ -27,7 +27,7 @@ def calculate_metrics(model, val_loader, device, num_classes, train_id_dict=None
         for batch in tqdm(val_loader):
             images, labels = batch[0].to(device), batch[1].to(device, dtype=torch.long)
             
-            outputs = model(images)
+            outputs = model(images, retrun_features=False, return_dict=False)
             if isinstance(outputs, (tuple, list)):
                 outputs = outputs[0]
 
