@@ -1,6 +1,10 @@
 import torch
 import torch.nn.functional as F
 from tqdm import tqdm
+<<<<<<< HEAD
+=======
+from helpers.sliding_window import SlidingWindowInferer
+>>>>>>> master
 
 def calculate_metrics(model, val_loader, device, num_classes, train_id_dict=None):
     """
@@ -23,10 +27,16 @@ def calculate_metrics(model, val_loader, device, num_classes, train_id_dict=None
     # 类别 ID 张量，用于广播比较 (1, K, 1)
     target_ids_tensor = torch.tensor(range(num_classes), device=device).view(1, -1, 1)
 
+<<<<<<< HEAD
+=======
+    inferer = SlidingWindowInferer()
+
+>>>>>>> master
     with torch.no_grad():
         for batch in tqdm(val_loader):
             images, labels = batch[0].to(device), batch[1].to(device, dtype=torch.long)
             
+<<<<<<< HEAD
             outputs = model(images, retrun_features=False, return_dict=False)
             if isinstance(outputs, (tuple, list)):
                 outputs = outputs[0]
@@ -35,6 +45,9 @@ def calculate_metrics(model, val_loader, device, num_classes, train_id_dict=None
                 outputs = F.interpolate(
                     outputs, size=labels.shape[-2:], mode='bilinear', align_corners=False
                 )
+=======
+            outputs = inferer(model, images)
+>>>>>>> master
 
             preds = torch.argmax(outputs, dim=1)
 

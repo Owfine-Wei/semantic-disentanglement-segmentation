@@ -5,8 +5,12 @@ seed:
 # 数据集配置
 dataset:
   name: 'cityscapes'
+<<<<<<< HEAD
   mode: 'csg'        # origin / foreground / background / csg / nda
   csg_mode: 'both'   # foreground / background / both
+=======
+  mode: 'csg'        # origin / csg
+>>>>>>> master
 
 # 模型配置
 model:
@@ -16,7 +20,11 @@ model:
 
 # 训练超参数
 train:
+<<<<<<< HEAD
   num_epochs: 5
+=======
+  num_epochs: 30
+>>>>>>> master
   batch_size: 2
   lr_backbone: 6.0e-6
   lr_classifier: 6.0e-5
@@ -44,6 +52,11 @@ warmup:
 
 # 日志与输出
 logging:
+<<<<<<< HEAD
   date: "_2_1_2026"
   info: "_ONLYFORTEST_"
+=======
+  date: "_2_4_2026"
+  info: "_BL+CSG+CL+WeightedErased1_"
+>>>>>>> master
   root: "../log/"

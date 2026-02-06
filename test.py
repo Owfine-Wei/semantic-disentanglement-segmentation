@@ -4,6 +4,7 @@ from PIL import Image
 import torch
 from configs import get_config
 from datasets.dataset_impl import load_data
+<<<<<<< HEAD
 
 # Configurable params
 dataset_name = 'cityscapes'
@@ -11,6 +12,15 @@ modes = ['origin', 'foreground', 'background', 'csg']  # 'nda' ignored
 csg_modes = ['foreground', 'background', 'both']
 split = 'train'
 samples_per_variant = 5
+=======
+from tqdm import *
+
+# Configurable params
+dataset_name = 'cityscapes'
+modes = ['origin', 'csg', 'flat', 'construction', 'object', 'nature', 'sky', 'human', 'vehicle'] 
+split = 'train'
+samples_per_variant = 25
+>>>>>>> master
 out_root = 'visualizations'  # will create visualizations/<dataset>/...
 
 # ImageNet mean/std for un-normalization
@@ -119,6 +129,7 @@ def process_loader_and_save(loader, out_dir, max_samples):
 
 def main():
     config = get_config(dataset_name)
+<<<<<<< HEAD
     for mode in modes:
         if mode == 'csg':
             for csg_mode in csg_modes:
@@ -130,6 +141,12 @@ def main():
             loader = load_data(config, mode, split, 'both')
             out_dir = os.path.join(out_root, dataset_name, mode)
             process_loader_and_save(loader, out_dir, samples_per_variant)
+=======
+    for mode in tqdm(modes):
+        loader = load_data(config, mode, split)
+        out_dir = os.path.join(out_root, dataset_name, mode)
+        process_loader_and_save(loader, out_dir, samples_per_variant)
+>>>>>>> master
 
 if __name__ == '__main__':
     main()

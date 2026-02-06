@@ -147,7 +147,11 @@ def get_contirb(checkpoint_path, input_tensor, grad_mask=None):
 	# Prepare input with grad enabled
 	input_var = input_tensor.to(device).requires_grad_(True)
 
+<<<<<<< HEAD
 	out = model(input_var)
+=======
+	out = model(input_var, return_features = False, return_dict = False)
+>>>>>>> master
 
 	# handle models returning tuple/list or dict
 	if isinstance(out, (tuple, list)):

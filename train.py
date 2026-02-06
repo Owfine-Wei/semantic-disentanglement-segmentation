@@ -197,7 +197,11 @@ def train(model, device, num_epochs, batch_size, lr_backbone, lr_classifier, fro
         logger(f"lr_backbone:{lr_backbone}, lr_classifier:{lr_classifier}, epochs:{num_epochs}, alpha:{train_config.loss.alpha}, beta:{train_config.loss.beta}\n")
 
     # Load dataset
+<<<<<<< HEAD
     train_iter = load_data(config, mode=train_config.dataset.mode, split='train', csg_mode=train_config.dataset.csg_mode, batch_size=batch_size, num_workers=12, distributed=is_distributed)
+=======
+    train_iter = load_data(config, mode=train_config.dataset.mode, split='train', batch_size=batch_size, num_workers=12, distributed=is_distributed)
+>>>>>>> master
     val_iter = load_data(config, mode='origin', split='val', batch_size=batch_size, num_workers=4, distributed=False)
     
     # Create model

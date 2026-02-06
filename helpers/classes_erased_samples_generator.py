@@ -9,7 +9,11 @@ foreground, background, or both according to `mode`.
 import random
 import torch
 
+<<<<<<< HEAD
 def classes_erased_samples_generator(config, origin_image, origin_label, mode):
+=======
+def classes_erased_samples_generator(config, origin_image, origin_label):
+>>>>>>> master
     """Return image/label/mask with selected classes erased.
 
     Args:
@@ -25,11 +29,16 @@ def classes_erased_samples_generator(config, origin_image, origin_label, mode):
     """
 
     # compute per-channel mean to fill erased regions
+<<<<<<< HEAD
     mean_rgb = origin_image.mean(dim=(1, 2), keepdim=True)
+=======
+    mean_rgb = torch.tensor(config.RGB_MEAN).view(3,1,1)
+>>>>>>> master
 
     # classes present in the current label map
     present_classes = torch.unique(origin_label)
 
+<<<<<<< HEAD
     # choose valid classes depending on mode and exclude ignore index 255
     if mode == 'foreground':
         valid_classes = [tid for tid in present_classes if tid in config.FOREGROUND_TRAINIDS and tid != 255]
@@ -39,11 +48,18 @@ def classes_erased_samples_generator(config, origin_image, origin_label, mode):
         valid_classes = [tid for tid in present_classes if tid in config.TRAINIDS and tid != 255]
     else:
         valid_classes = []
+=======
+    valid_classes = [tid for tid in present_classes if tid in config.TRAINIDS and tid!=255]
+>>>>>>> master
 
     # sample up to `num_erased_class` classes to erase
     if len(valid_classes) > 0:
         count = min(len(valid_classes), config.num_erased_class)
+<<<<<<< HEAD
         erased_classes = random.sample(valid_classes, count)
+=======
+        erased_classes = random.sample(valid_classes, k=count)
+>>>>>>> master
     else:
         erased_classes = []
 

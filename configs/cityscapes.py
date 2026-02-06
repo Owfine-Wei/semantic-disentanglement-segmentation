@@ -52,11 +52,20 @@ class CityScapesConfig:
     # DATA PROCESSING
     # ==============================================================================
 
+<<<<<<< HEAD
     CROP_SIZE = (512, 1024)
+=======
+    CROP_SIZE = (1024, 1024)
+>>>>>>> master
 
     RGB_MEAN = [123.675/255.0, 116.28/255.0, 103.53/255.0]
 
     RGB_STD = [58.395/255.0, 57.12/255.0, 57.375/255.0]
+<<<<<<< HEAD
+=======
+    
+    SCALE_SIZE = None
+>>>>>>> master
 
     # ==============================================================================
     # CITYSCAPES CLASSES
@@ -64,6 +73,7 @@ class CityScapesConfig:
 
     NUM_CLASSES = 19
 
+<<<<<<< HEAD
     # Train IDs
     BACKGROUND_TRAINIDS = [
         0,   # road
@@ -82,6 +92,47 @@ class CityScapesConfig:
         7,   # traffic sign
         11,  # person
         12,  # rider
+=======
+    # 1. FLAT (平整地面)
+    FLAT_TRAINIDS = [
+        0,   # road
+        1    # sidewalk
+    ]
+
+    # 2. CONSTRUCTION (建筑构造)
+    CONSTRUCTION_TRAINIDS = [
+        2,   # building
+        3,   # wall
+        4    # fence
+    ]
+
+    # 3. OBJECT (街道设施/杆状物)
+    OBJECT_TRAINIDS = [
+        5,   # pole
+        6,   # traffic light
+        7    # traffic sign
+    ]
+
+    # 4. NATURE (自然景观)
+    NATURE_TRAINIDS = [
+        8,   # vegetation
+        9    # terrain
+    ]
+
+    # 5. SKY (天空)
+    SKY_TRAINIDS = [
+        10   # sky
+    ]
+
+    # 6. HUMAN (人类/非机动个体)
+    HUMAN_TRAINIDS = [
+        11,  # person
+        12   # rider
+    ]
+
+    # 7. VEHICLE (交通工具/车辆)
+    VEHICLE_TRAINIDS = [
+>>>>>>> master
         13,  # car
         14,  # truck
         15,  # bus
@@ -138,12 +189,19 @@ class CityScapesConfig:
 
     IMG_SIZE = (1024, 2048)
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> master
     # ==============================================================================
     # ERASED CLASSES SAMPLES (CES)
     # ==============================================================================
 
+<<<<<<< HEAD
     num_erased_class = 1
+=======
+    num_erased_class = 2
+>>>>>>> master
 
 
     # ==============================================================================
