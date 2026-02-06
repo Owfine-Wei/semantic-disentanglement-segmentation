@@ -10,7 +10,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 config = get_config('cityscapes')
 
-loader = load_data(config,'csg','train','both')
+loader = load_data(config,'csg','train')
 
 get_model_function = get_model('segformer')
 
