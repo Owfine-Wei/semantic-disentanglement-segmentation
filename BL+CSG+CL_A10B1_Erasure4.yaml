@@ -16,7 +16,7 @@ model:
 # 训练超参数
 train:
   num_epochs: 30
-  batch_size: 2
+  batch_size: 1 
   lr_backbone: 6.0e-6
   lr_classifier: 6.0e-5
   bn_frozen: true
@@ -43,6 +43,6 @@ warmup:
 
 # 日志与输出
 logging:
-  date: "_2_4_2026"
-  info: "_BL+CSG+CL+WeightedErased1_"
+  date: "_2_7_2026"
+  info: "_BL+CSG+CL_A10B1_Erasure4_"
   root: "../log/"

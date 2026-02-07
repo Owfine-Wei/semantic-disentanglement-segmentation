@@ -1,0 +1,48 @@
+# 种子配置
+seed:
+  35
+
+# 数据集配置
+dataset:
+  name: 'cityscapes'
+  mode: 'csg'        # origin / csg
+
+# 模型配置
+model:
+  name: 'segformer'
+  from_scratch: false
+  checkpoint_path: '../models/segformer_bl.bin'
+
+# 训练超参数
+train:
+  num_epochs: 30
+  batch_size: 1 
+  lr_backbone: 6.0e-6
+  lr_classifier: 6.0e-5
+  bn_frozen: true
+
+# 损失函数权重
+loss:
+  alpha: 0.0
+  beta: 0.0
+
+# 优化器
+optimizer:
+  name: "AdamW" # AdamW or SGD
+  betas:
+   - 0.9
+   - 0.999
+  weight_decay: 0.01
+  momentum: 0.9
+
+# 学习率预热
+warmup:
+  enabled: true
+  iters: 1500
+  factor: 0.001
+
+# 日志与输出
+logging:
+  date: "_2_7_2026"
+  info: "_BL+CSG_B0_Erasure4_"
+  root: "../log/"

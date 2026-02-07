@@ -16,19 +16,19 @@ get_model_function = get_model('segformer')
 
 model = get_model_function(19, None)
 model = model.to(device)
-model.eval()
 
-for images, labels, masks, origin_images, origin_labels in loader:
+with torch.no_grad():
+    for images, labels, masks, origin_images, origin_labels in loader:
 
-    criterion = nn.CrossEntropyLoss(ignore_index=255)
+        criterion = nn.CrossEntropyLoss(ignore_index=255)
 
-    images = images.to(device)
-    labels = labels.to(device)
-    origin_images = origin_images.to(device) 
-    origin_labels = origin_labels.to(device, dtype=torch.long)
-    masks = masks.to(device, dtype=torch.float32)
+        images = images.to(device)
+        labels = labels.to(device)
+        origin_images = origin_images.to(device) 
+        origin_labels = origin_labels.to(device, dtype=torch.long)
+        masks = masks.to(device, dtype=torch.float32)
 
-    logits_img, features_img = model(images, return_features=True, return_dict=False) 
-    logits_origin_img, features_origin_img = model(origin_images, return_features=True, return_dict=False)
+        logits_img, features_img = model(images, return_features=True, return_dict=False) 
+        logits_origin_img, features_origin_img = model(origin_images, return_features=True, return_dict=False)
 
-    loss = compute_integrated_loss(logits_img, labels, masks, logits_origin_img, origin_labels, features_img, features_origin_img, criterion, 'csg', 1, 1)
+        loss = compute_integrated_loss(logits_img, labels, masks, logits_origin_img, origin_labels, features_img, features_origin_img, criterion, 'csg', 1, 1)

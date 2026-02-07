@@ -73,8 +73,6 @@ def compute_integrated_loss(logits_img, labels, masks, logits_origin_img, origin
 
         integrated_loss = loss_img + alpha * consist_loss + beta * loss_origin
 
-        print(f'loss_img{loss_img:.6f}, loss_consist{consist_loss:.6f}, loss_origin{loss_origin:.6f}')
-
     else:
         integrated_loss = loss_img
 
